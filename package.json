@@ -1,0 +1,41 @@
+{
+    "name": "@ecromaneli/search-engine",
+    "version": "1.0.0",
+    "description": "A powerful object search engine with advanced query syntax",
+    "main": "index.js",
+    "files": [
+      "index.js",
+      "README.md",
+      "LICENSE"
+    ],
+    "exports": {
+      ".": "./index.js"
+    },
+    "scripts": {
+      "test": "jest"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/ECRomaneli/electron-findbar.git"
+      },
+      "keywords": [
+        "search",
+        "filter",
+        "query",
+        "search engine",
+        "search-engine",
+        "engine",
+        "deep search",
+        "deep",
+        "objects"
+      ],
+      "author": "ECRomaneli",
+      "license": "MIT",
+      "bugs": {
+        "url": "https://github.com/ECRomaneli/Search-Engine/issues"
+      },
+      "homepage": "https://github.com/ECRomaneli/Search-Engine#readme",
+    "devDependencies": {
+      "jest": "^29.7.0"
+    }
+  }
