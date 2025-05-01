@@ -74,6 +74,7 @@ describe('Search Engine', () => {
     test('Empty/null inputs handling', () => {
         expect(search(testData, "")).toEqual(testData)
         expect(search(testData, null)).toEqual(testData)
+        expect(search(testData, undefined)).toEqual(testData)
         expect(search(null, "name:john")).toEqual([])
         expect(search(undefined, "name:john")).toEqual([])
     })
@@ -118,8 +119,8 @@ describe('Search Engine', () => {
             const query = "active:true and tags:developer"
             const results = search(testData, query)
             expect(results.length).toBe(2)
-            expect(results.some(r => r.id === 1)).toBe(true)
-            expect(results.some(r => r.id === 4)).toBe(true)
+            expect(results[0].id).toBe(1)
+            expect(results[1].id).toBe(4)
         })
     })
 
@@ -129,17 +130,17 @@ describe('Search Engine', () => {
             const query = "name*:j.*n"  // Matches "John", "Jane", and "Johnson"
             const results = search(testData, query)
             expect(results.length).toBe(3)
-            expect(results.some(r => r.id === 1)).toBe(true)
-            expect(results.some(r => r.id === 2)).toBe(true)
-            expect(results.some(r => r.id === 3)).toBe(true)
+            expect(results[0].id).toBe(1)
+            expect(results[1].id).toBe(2)
+            expect(results[2].id).toBe(3)
         })
 
         test('Complex regex patterns', () => {
             const query = 'email*:alice|jane'  // Matches emails with alice or jane
             const results = search(testData, query)
             expect(results.length).toBe(2)
-            expect(results.some(r => r.id === 2)).toBe(true)
-            expect(results.some(r => r.id === 4)).toBe(true)
+            expect(results[0].id).toBe(2)
+            expect(results[1].id).toBe(4)
         })
     })
 
@@ -149,26 +150,26 @@ describe('Search Engine', () => {
             const query = "age~:25-30"
             const results = search(testData, query)
             expect(results.length).toBe(3)
-            expect(results.some(r => r.id === 1)).toBe(true)
-            expect(results.some(r => r.id === 2)).toBe(true)
-            expect(results.some(r => r.id === 4)).toBe(true)
+            expect(results[0].id).toBe(1)
+            expect(results[1].id).toBe(2)
+            expect(results[2].id).toBe(4)
         })
 
         test('Lower bound only', () => {
             const query = "age~:35-"
             const results = search(testData, query)
             expect(results.length).toBe(2)
-            expect(results.some(r => r.id === 3)).toBe(true)
-            expect(results.some(r => r.id === 5)).toBe(true)
+            expect(results[0].id).toBe(3)
+            expect(results[1].id).toBe(5)
         })
 
         test('Upper bound only', () => {
             const query = "age~:-30"
             const results = search(testData, query)
             expect(results.length).toBe(3)
-            expect(results.some(r => r.id === 1)).toBe(true)
-            expect(results.some(r => r.id === 2)).toBe(true)
-            expect(results.some(r => r.id === 4)).toBe(true)
+            expect(results[0].id).toBe(1)
+            expect(results[1].id).toBe(2)
+            expect(results[2].id).toBe(4)
         })
     })
 
@@ -178,17 +179,17 @@ describe('Search Engine', () => {
             const query = "not active:true"
             const results = search(testData, query)
             expect(results.length).toBe(3)
-            expect(results.some(r => r.id === 3)).toBe(true)
-            expect(results.some(r => r.id === 5)).toBe(true)
-            expect(results.some(r => r.id === 6)).toBe(true)
+            expect(results[0].id).toBe(3)
+            expect(results[1].id).toBe(5)
+            expect(results[2].id).toBe(6)
         })
 
         test('Negation with other conditions', () => {
             const query = "not name:john and active:true"
             const results = search(testData, query)
             expect(results.length).toBe(2)
-            expect(results.some(r => r.id === 2)).toBe(true)
-            expect(results.some(r => r.id === 4)).toBe(true)
+            expect(results[0].id).toBe(2)
+            expect(results[1].id).toBe(4)
         })
     })
 
