@@ -3,18 +3,10 @@
 A lightweight, powerful object search engine for JavaScript with advanced query syntax
 
 <p>
-    <a href="https://github.com/ECRomaneli/Search-Engine/tags" style='text-decoration:none'>
-        <img src="https://img.shields.io/github/v/tag/ecromaneli/Search-Engine?label=version&sort=semver" alt="Version">
-    </a>
-    <a href="https://github.com/ECRomaneli/Search-Engine/commits/master" style='text-decoration:none'>
-        <img src="https://img.shields.io/github/last-commit/ecromaneli/Search-Engine" alt="Last Commit">
-    </a>
-    <a href="https://github.com/ECRomaneli/Search-Engine/blob/master/LICENSE" style='text-decoration:none'>
-        <img src="https://img.shields.io/github/license/ecromaneli/Search-Engine" alt="License">
-    </a>
-    <a href="https://github.com/ECRomaneli/Search-Engine/issues" style='text-decoration:none'>
-        <img src="https://img.shields.io/badge/contributions-welcome-brightgreen.svg" alt="Contributions Welcome">
-    </a>
+    <a href="https://github.com/ECRomaneli/Search-Engine/tags"><img src="https://img.shields.io/github/v/tag/ecromaneli/Search-Engine?label=version&sort=semver" alt="Version"></a>
+    <a href="https://github.com/ECRomaneli/Search-Engine/commits/master"><img src="https://img.shields.io/github/last-commit/ecromaneli/Search-Engine" alt="Last Commit"></a>
+    <a href="https://github.com/ECRomaneli/Search-Engine/blob/master/LICENSE"><img src="https://img.shields.io/github/license/ecromaneli/Search-Engine" alt="License"></a>
+    <a href="https://github.com/ECRomaneli/Search-Engine/issues"><img src="https://img.shields.io/badge/contributions-welcome-brightgreen.svg" alt="Contributions Welcome"></a>
 </p>
 
 ## Installation
