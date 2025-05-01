@@ -1,24 +1,20 @@
 {
     "name": "@ecromaneli/search-engine",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "description": "A powerful object search engine with advanced query syntax",
-    "main": "index.js",
-    "files": [
-      "index.js",
-      "README.md",
-      "LICENSE"
-    ],
+    "main": "dist/npm/index.min.js",
+    "files": [ "dist/npm/index.min.*", "dist/npm/index.d.*", "README.md", "LICENSE" ],
     "exports": {
-      ".": "./index.js"
+        ".": "./dist/npm/index.min.js"
     },
     "scripts": {
-      "test": "jest"
+        "test": "jest"
     },
     "repository": {
         "type": "git",
         "url": "git+https://github.com/ECRomaneli/electron-findbar.git"
-      },
-      "keywords": [
+    },
+    "keywords": [
         "search",
         "filter",
         "query",
@@ -28,14 +24,16 @@
         "deep search",
         "deep",
         "objects"
-      ],
-      "author": "ECRomaneli",
-      "license": "MIT",
-      "bugs": {
+    ],
+    "author": "ECRomaneli",
+    "license": "MIT",
+    "bugs": {
         "url": "https://github.com/ECRomaneli/Search-Engine/issues"
-      },
-      "homepage": "https://github.com/ECRomaneli/Search-Engine#readme",
+    },
+    "homepage": "https://github.com/ECRomaneli/Search-Engine#readme",
     "devDependencies": {
-      "jest": "^29.7.0"
+        "jest": "^29.7.0",
+        "typescript": "^5.8.3",
+        "uglify-js": "^3.19.3"
     }
-  }
+}

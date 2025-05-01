@@ -23,6 +23,34 @@ A lightweight, powerful object search engine for JavaScript with advanced query 
 npm install @ecromaneli/search-engine
 ```
 
+## Download
+
+For browser usage, you can download and use the pre-built version:
+
+1. Go to the [Releases page](https://github.com/ECRomaneli/Search-Engine/releases/latest)
+2. Download the `search-engine-web.zip` file 
+3. Extract the ZIP and include the script in your HTML:
+
+```html
+<!-- Include the script in your HTML file -->
+<script src="path/to/search-engine.js"></script>
+<!-- Or use the minified version -->
+<!-- <script src="path/to/search-engine.min.js"></script> -->
+
+<script>
+  // Sample data
+  const users = [
+    { id: 1, name: 'John Doe', age: 28, tags: ['developer', 'javascript'] },
+    { id: 2, name: 'Jane Smith', age: 34, tags: ['designer', 'ui/ux'] },
+    { id: 3, name: 'Bob Johnson', age: 45, tags: ['manager', 'finance'] }
+  ];
+  
+  // Use SearchEngine.search() directly
+  const results = SearchEngine.search(users, 'name:john');
+  console.log(results);
+</script>
+```
+
 ## Features
 
 - Powerful query language with boolean operators (AND/OR)

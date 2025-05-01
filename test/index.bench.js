@@ -274,5 +274,5 @@ function runSearchBenchmark() {
     })
 }
 
-const { search } = require('./index')
+const { search } = require('../lib/index')
 runSearchBenchmark()

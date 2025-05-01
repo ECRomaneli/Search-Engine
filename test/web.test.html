@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Search Engine</title>
+</head>
+<body>
+    <input type="text" name="search">
+    <div id="results"></div>
+    <script src="../dist/web/search-engine.js"></script>
+    <script>
+        const dataset = [
+            { id: 1, name: 'Apple', description: 'A sweet red fruit' },
+            { id: 2, name: 'Banana', description: 'A long yellow fruit' },
+            { id: 3, name: 'Cherry', description: 'A small red fruit' },
+            { id: 4, name: 'Date', description: 'A sweet brown fruit' },
+            { id: 5, name: 'Elderberry', description: 'A small dark purple fruit' }
+        ];
+        const input = document.querySelector('input[name="search"]');
+        const results = document.getElementById('results');
+        results.innerText = JSON.stringify(SearchEngine.search(dataset, ''));
+        input.addEventListener('input', (event) => {
+            const query = event.target.value;
+            results.innerText = JSON.stringify(SearchEngine.search(dataset, event.target.value));
+        });
+    </script>
+</body>
+</html>
