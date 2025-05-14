@@ -1,6 +1,6 @@
 {
     "name": "@ecromaneli/search-engine",
-    "version": "1.2.0",
+    "version": "1.2.1",
     "description": "A powerful object search engine with advanced query syntax",
     "main": "dist/npm/index.min.js",
     "files": [ "dist/npm/index.min.*", "dist/npm/index.d.*", "README.md", "LICENSE" ],
@@ -12,7 +12,7 @@
     },
     "repository": {
         "type": "git",
-        "url": "git+https://github.com/ECRomaneli/electron-findbar.git"
+        "url": "git+https://github.com/ECRomaneli/Search-Engine.git"
     },
     "keywords": [
         "search",
