@@ -100,7 +100,7 @@ const result4 = search(users, '("developer" or "designer") and not age~:40-50')
 ### Negation and Grouping
 
 - `not term` - Term must not match
-- `(term1 or term2) and term3` - Logical grouping with parentheses
+- `not (term1 or term2) and term3` - Logical grouping with parentheses
 
 ## API Reference
 

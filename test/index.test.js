@@ -191,6 +191,14 @@ describe('Search Engine', () => {
             expect(results[0].id).toBe(2)
             expect(results[1].id).toBe(4)
         })
+
+        test('Negation of groups', () => {
+            const query = "not(not(not((name:john or not active:true))))"
+            const results = search(testData, query)
+            expect(results.length).toBe(2)
+            expect(results[0].id).toBe(2)
+            expect(results[1].id).toBe(4)
+        })
     })
 
     // 6. Nested property searching
@@ -241,6 +249,14 @@ describe('Search Engine', () => {
             expect(results.some(r => r.id === 2)).toBe(true)
         })
 
+        test('Simple grouping De Morgan', () => {
+            const query = "not (not age:25 and not age:30)"
+            const results = search(testData, query)
+            expect(results.length).toBe(2)
+            expect(results.some(r => r.id === 1)).toBe(true)
+            expect(results.some(r => r.id === 2)).toBe(true)
+        })
+
         test('Nested grouping', () => {
             const query = "active:true and (age~:25-30 or tags:python)"
             const results = search(testData, query)
@@ -251,7 +267,7 @@ describe('Search Engine', () => {
         })
 
         test('Complex expression', () => {
-            const query = '(active:"true" and ((age~:"25-30"))) or((((not active:true))) and ((((age:35)))))'
+            const query = 'not (not active:"true" or not (not(not age~:"25-30"))) or((((not active:true))) and ((((age:35)))))'
             const results = search(testData, query)
             expect(results.length).toBe(4)
             expect(results.some(r => r.id === 1)).toBe(true)
@@ -346,6 +362,73 @@ describe('Search Engine', () => {
             const results = search(testData, query)
             expect(results.length).toBe(1)
             expect(results[0].id).toBe(6)
+        })
+    })
+
+    describe('All features together', () => {
+        test('Combined search with all features', () => {
+            // This complex query combines:
+            // - Regex pattern matching (name*:^J)
+            // - Range searches (age~:25-35)
+            // - Negation (not tags:manager)
+            // - Group negation (not (age:45 or tags:golang))
+            // - Boolean operators (and/or)
+            // - Multiple nested groups
+            // - Field-only search (skill_level)
+            // - Value-only search ("developer")
+            
+            const query = `
+                (name*:^J and age~:25-35 and not tags:manager) 
+                or 
+                ("developer" and not (age:45 or tags:golang)) 
+                or 
+                (skill_level and not (active:false))
+            `.replace(/\n/g, ' ').trim()
+            
+            const results = search(testData, query)
+            
+            // Expected matches:
+            // id:1 - John Smith: matches (name*:^J and age~:25-35)
+            // id:2 - Jane Doe: matches (name*:^J and age~:25-35)
+            // id:4 - Alice Williams: matches ("developer" and not (age:45 or tags:golang))
+            
+            expect(results.length).toBe(3)
+            expect(results.some(r => r.id === 1)).toBe(true)
+            expect(results.some(r => r.id === 2)).toBe(true)
+            expect(results.some(r => r.id === 4)).toBe(true)
+            
+            // These should NOT match:
+            expect(results.some(r => r.id === 3)).toBe(false) // Bob: age 45, tags:manager
+            expect(results.some(r => r.id === 5)).toBe(false) // Charlie: active:false with skill_level
+            expect(results.some(r => r.id === 6)).toBe(false) // Eve: tags:golang
+        })
+    
+        test('Advanced De Morgan negation with all features', () => {
+            // This query tests complex negation logic with De Morgan's laws
+            // not(A and B) is equivalent to (not A or not B)
+            const query = `
+                not (
+                    not (name*:^[JB] or age~:32-45) 
+                    and 
+                    not ("developer" or active:true)
+                )
+            `.replace(/\n/g, ' ').trim()
+            
+            const results = search(testData, query)
+            
+            // This complex query resolves to:
+            // (name*:^[JB] or age~:32-45) or ("developer" or active:true)
+            // Which should match all records except id:6 (Eve)
+            
+            expect(results.length).toBe(5)
+            expect(results.some(r => r.id === 6)).toBe(false)
+            
+            // Verify the breakdown of matching conditions:
+            const exactQuery = "(name*:^[JB] or age~:32-45) or (\"developer\" or active:true)"
+            const exactResults = search(testData, exactQuery)
+            expect(exactResults.length).toBe(5)
+            expect(JSON.stringify(results.map(r => r.id).sort()))
+                .toBe(JSON.stringify(exactResults.map(r => r.id).sort()))
         })
     })
 })

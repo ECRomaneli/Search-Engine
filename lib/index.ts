@@ -7,10 +7,10 @@ const GROUP_START = '('
 const GROUP_END = ')'
 const EMPTY_QUOTES_STR = '""'
 const KEY_SEPARATOR = '.'
-const NEGATED_PREFIX = 'not '
+const NEGATED_PREFIX = 'not'
 const RANGE_REGEXP = /^[-\D]*(-?\d+(\.\d+)?)?[-\D]*-[-\D]*(-?\d+(\.\d+)?)?[-\D]*$/
-const TOKENIZER = new RegExp(` *(\\${GROUP_START})| *(${NEGATED_PREFIX}+)?(?:((?:\\\\.|[^ ${GROUP_START}${GROUP_END}\\\\${REGEX_CHAR}${RANGE_CHAR}${TOKEN_SEPARATOR}])+) *([${REGEX_CHAR}${RANGE_CHAR}]?${TOKEN_SEPARATOR}))? *("((?:\\\\.|[^"\\\\])+)"|(?:\\\\.|[^ ${GROUP_START}${GROUP_END}\\\\])+)? *(\\${GROUP_END})? *(and|or|\\)|$)`, 'g')
-const TOKEN = { GROUP_START: 1, NEGATED: 2, KEY: 3, TYPE: 4, VALUE: 5, QUOTED_VALUE: 6, GROUP_END: 7, OPERATOR: 8 }
+const TOKENIZER = new RegExp(` *(${NEGATED_PREFIX})? *(\\${GROUP_START})| *(${NEGATED_PREFIX} +)?(?:((?:\\\\.|[^ ${GROUP_START}${GROUP_END}\\\\${REGEX_CHAR}${RANGE_CHAR}${TOKEN_SEPARATOR}])+) *([${REGEX_CHAR}${RANGE_CHAR}]?${TOKEN_SEPARATOR}))? *("((?:\\\\.|[^"\\\\])+)"|(?:\\\\.|[^ ${GROUP_START}${GROUP_END}\\\\])+)? *(and|or|\\${GROUP_END}|$)`, 'g')
+const TOKEN = { GROUP_NEGATED: 1, GROUP_START: 2, NEGATED: 3, KEY: 4, TYPE: 5, VALUE: 6, QUOTED_VALUE: 7, OPERATOR: 8 }
 const UNKNOWN = -1
 const EMPTY_ARR: any[] = []
 const EMPTY_STR = ''
@@ -34,6 +34,7 @@ interface Range {
 
 class GroupQuery {
     conditions: (Query | GroupQuery)[]
+    negated?: boolean
     operator?: Operator
 
     constructor() {
@@ -71,14 +72,16 @@ function search<T extends Record<string, any>>(objList: T[], queryStr: string, e
     
     if (!queryStr || queryStr.trim() === EMPTY_STR) { return objList.slice() }
 
-    return [...evaluateConditions(objList, extractConditionsFromQuery(queryStr.toLowerCase()), exclude)]
+    return [...evaluateCondition(objList, extractConditionsFromQuery(queryStr.toLowerCase()), exclude)]
 }
 
 function extractConditionsFromQuery(query: string, regex = new RegExp(TOKENIZER), group = new GroupQuery()): GroupQuery {
     let m: RegExpExecArray | null
     while ((m = regex.exec(query)) !== null && m[0] !== EMPTY_STR) {                
         if (m[TOKEN.GROUP_START]) {
-            group.conditions.push(extractConditionsFromQuery(query, regex))
+            const subGroup = extractConditionsFromQuery(query, regex)
+            subGroup.negated = !!m[TOKEN.GROUP_NEGATED]
+            group.conditions.push(subGroup)
             continue
         }
 
@@ -96,16 +99,7 @@ function extractConditionsFromQuery(query: string, regex = new RegExp(TOKENIZER)
             group.conditions.push(getQuery(!!m[TOKEN.NEGATED], type, key, value))
         }
 
-        if (m[TOKEN.OPERATOR] === GROUP_END) {
-            m[TOKEN.GROUP_END] = GROUP_END
-            m[TOKEN.OPERATOR] = void 0
-        }
-
-        if (m[TOKEN.GROUP_END]) {
-            if (m[TOKEN.OPERATOR]) { group.operator = Operator.from(m[TOKEN.OPERATOR]) }
-            break
-        }
-
+        if (m[TOKEN.OPERATOR] === GROUP_END) { break }
         if (m[TOKEN.OPERATOR]) { group.lastCondition()!.operator = Operator.from(m[TOKEN.OPERATOR]) }
     }
 
@@ -151,7 +145,7 @@ function getQuery(negated: boolean, type?: string, key?: string, value?: string)
     return query
 }
 
-function evaluateConditions<T>(objList: T[], group: GroupQuery, exclude?: string[]): Set<T> {
+function evaluateGroup<T>(objList: T[], group: GroupQuery, exclude?: string[]): Set<T> {
     if (group.conditions.length === 0) { return new Set(objList) }
     
     let currentResults = evaluateCondition(objList, group.conditions[0], exclude)
@@ -172,7 +166,24 @@ function evaluateConditions<T>(objList: T[], group: GroupQuery, exclude?: string
 }
 
 function evaluateCondition<T>(objList: T[], condition: Query | GroupQuery, exclude?: string[]): Set<T> {
-    if ('conditions' in condition) { return evaluateConditions(objList, condition, exclude) }
+    if ('conditions' in condition) { 
+        // Get the result of evaluating the group
+        const groupResult = evaluateGroup(objList, condition, exclude)
+        
+        // If the group is negated, return everything except the group results
+        if (condition.negated) {
+            const negatedResult = new Set<T>()
+            objList.forEach(obj => {
+                if (!groupResult.has(obj)) {
+                    negatedResult.add(obj)
+                }
+            })
+            return negatedResult
+        }
+        
+        return groupResult
+    }
+    
     const resultSet = new Set<T>()
     objList.forEach(obj => {
         if (condition.negated !== findQuery(obj, condition, EMPTY_STR, exclude)) {
@@ -182,7 +193,7 @@ function evaluateCondition<T>(objList: T[], condition: Query | GroupQuery, exclu
     return resultSet
 }
 
-function findQuery(obj: Object, query: Query, nestedKeys: string, excludedKeys?: string[], keyFound?: boolean): boolean {
+function findQuery(obj: any, query: Query, nestedKeys: string, excludedKeys?: string[], keyFound?: boolean): boolean {
     return getObjectKeys(obj).some((key) => {
         const newNestedKeys = nestedKeys + KEY_SEPARATOR + key.toLowerCase()
 
