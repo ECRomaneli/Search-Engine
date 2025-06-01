@@ -18,6 +18,7 @@ const STRING = 'string'
 const NUMBER = 'number'
 const BOOLEAN = 'boolean'
 const BIGINT = 'bigint'
+const OBJECT = 'object'
 
 interface Query {
     key: any
@@ -42,7 +43,7 @@ class GroupQuery {
         this.operator = void 0
     }
 
-    lastCondition(): Query | GroupQuery | undefined {
+    lastCondition(): Query | GroupQuery {
         return this.conditions[this.conditions.length - 1]
     }
 }
@@ -69,10 +70,8 @@ namespace Operator {
  */
 function search<T extends Record<string, any>>(objList: T[], queryStr: string, exclude?: string[]): T[] {
     if (!objList) { return [] }
-    
     if (!queryStr || queryStr.trim() === EMPTY_STR) { return objList.slice() }
-
-    return [...evaluateCondition(objList, extractConditionsFromQuery(queryStr.toLowerCase()), exclude)]
+    return [...evaluateGroup(new Set(objList), extractConditionsFromQuery(queryStr.toLowerCase()), exclude)]
 }
 
 function extractConditionsFromQuery(query: string, regex = new RegExp(TOKENIZER), group = new GroupQuery()): GroupQuery {
@@ -145,8 +144,8 @@ function getQuery(negated: boolean, type?: string, key?: string, value?: string)
     return query
 }
 
-function evaluateGroup<T>(objList: T[], group: GroupQuery, exclude?: string[]): Set<T> {
-    if (group.conditions.length === 0) { return new Set(objList) }
+function evaluateGroup<T>(objList: Set<T>, group: GroupQuery, exclude?: string[]): Set<T> {
+    if (group.conditions.length === 0) { return group.negated ? new Set() : objList }
     
     let currentResults = evaluateCondition(objList, group.conditions[0], exclude)
     
@@ -158,31 +157,20 @@ function evaluateGroup<T>(objList: T[], group: GroupQuery, exclude?: string[]): 
             const nextResults = evaluateCondition(objList, condition, exclude)
             nextResults.forEach(item => currentResults.add(item))
         } else {
-            currentResults = evaluateCondition([...currentResults], condition, exclude)
+            currentResults = evaluateCondition(currentResults, condition, exclude)
         }
     }
     
-    return currentResults
+    if (!group.negated) { return currentResults }
+
+    // If the group is negated, return everything except the group results
+    const negatedResult = new Set<T>()
+    for (const obj of objList) { currentResults.has(obj) || negatedResult.add(obj) }
+    return negatedResult
 }
 
-function evaluateCondition<T>(objList: T[], condition: Query | GroupQuery, exclude?: string[]): Set<T> {
-    if ('conditions' in condition) { 
-        // Get the result of evaluating the group
-        const groupResult = evaluateGroup(objList, condition, exclude)
-        
-        // If the group is negated, return everything except the group results
-        if (condition.negated) {
-            const negatedResult = new Set<T>()
-            objList.forEach(obj => {
-                if (!groupResult.has(obj)) {
-                    negatedResult.add(obj)
-                }
-            })
-            return negatedResult
-        }
-        
-        return groupResult
-    }
+function evaluateCondition<T>(objList: Set<T>, condition: Query | GroupQuery, exclude?: string[]): Set<T> {
+    if ('conditions' in condition) { return evaluateGroup(objList, condition, exclude) }
     
     const resultSet = new Set<T>()
     objList.forEach(obj => {
@@ -194,22 +182,29 @@ function evaluateCondition<T>(objList: T[], condition: Query | GroupQuery, exclu
 }
 
 function findQuery(obj: any, query: Query, nestedKeys: string, excludedKeys?: string[], keyFound?: boolean): boolean {
-    return getObjectKeys(obj).some((key) => {
-        const newNestedKeys = nestedKeys + KEY_SEPARATOR + key.toLowerCase()
+    const keys = getObjectKeys(obj)
+    nestedKeys += KEY_SEPARATOR
+    for (const key of keys) {
+        const newNestedKeys = nestedKeys + key.toLowerCase()
 
-        if (isExcluded(newNestedKeys, excludedKeys)) { return false }
-        
+        if (isExcluded(newNestedKeys, excludedKeys)) { continue }
+
         if (keyFound === void 0) {
             if (newNestedKeys.indexOf(query.key!) === UNKNOWN) {
-                return findQuery(obj[key], query, newNestedKeys, excludedKeys)
+                if (findQuery(obj[key], query, newNestedKeys, excludedKeys)) {
+                    return true
+                }
+                continue
             }
 
             if (query.value === void 0) { return true }
         }
 
-        return match(query.value, obj[key], query.type) || 
-               findQuery(obj[key], query, newNestedKeys, excludedKeys, true)
-    })
+        if (match(query.value, obj[key], query.type) || findQuery(obj[key], query, newNestedKeys, excludedKeys, true)) {
+            return true
+        }
+    }
+    return false
 }
 
 function match(expectedValue: any, value: any, type?: string): boolean {
@@ -248,7 +243,7 @@ function isExcluded(nestedKeys: string, excludedKeys?: string[]): boolean {
 }
 
 function getObjectKeys(obj: Object): string[] {
-    return obj instanceof Object ? Object.keys(obj) : EMPTY_ARR
+    return typeof obj === OBJECT && obj !== null ? Object.keys(obj) : EMPTY_ARR
 }
 
 function removeEscapeChar(str?: string): string | void {    

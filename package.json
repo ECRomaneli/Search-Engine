@@ -9,7 +9,8 @@
     },
     "scripts": {
         "build": "./build.sh",
-        "test": "jest"
+        "test": "jest",
+        "bench": "node ./test/index.bench.js"
     },
     "repository": {
         "type": "git",

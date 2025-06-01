@@ -254,6 +254,7 @@ function runSearchBenchmark() {
         "not details.color:green",
         "description:\"searchable content\"",
         "tags*:.tag+ and details.weight~:0-5",
+        '(details.color*:^g or description:\"searchable content\" and not price~:0-100) or ("red" and not (age:45 or tags:golang)) or (tag2 and not (name:item))'
     ]
     
     // Implementations to benchmark
@@ -274,5 +275,5 @@ function runSearchBenchmark() {
     })
 }
 
-const { search } = require('../lib/index')
+const { search } = require('../dist/npm/index.js')
 runSearchBenchmark()

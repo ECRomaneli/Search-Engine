@@ -363,6 +363,12 @@ describe('Search Engine', () => {
             expect(results.length).toBe(1)
             expect(results[0].id).toBe(6)
         })
+
+        test('Uncommon groups', () => {
+            const query = 'not(not())'
+            const results = search(testData, query)
+            expect(results.length).toBe(6)
+        })
     })
 
     describe('All features together', () => {
