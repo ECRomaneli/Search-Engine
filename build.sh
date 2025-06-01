@@ -91,8 +91,8 @@ EOF
 
 # Step 4: Minify both versions
 echo -e "${GREEN}Minifying files...${NC}"
-npx uglifyjs dist/npm/index.js -o dist/npm/index.min.js -c -m --source-map "url='index.min.js.map'"
-npx uglifyjs dist/web/search-engine.js -o dist/web/search-engine.min.js -c -m --source-map "url='search-engine.min.js.map'"
+npx uglifyjs dist/npm/index.js -o dist/npm/index.min.js -c -m --source-map "includeSources=true,url='index.min.js.map'"
+npx uglifyjs dist/web/search-engine.js -o dist/web/search-engine.min.js -c -m --source-map "includeSources=true,url='search-engine.min.js.map'"
 
 # Step 5: Copy package.json and README for npm distribution
 echo -e "${GREEN}Preparing npm package files...${NC}"

@@ -4,8 +4,9 @@
       "module": "commonjs",
       "declaration": true,
       "outDir": "./dist/npm",
-      "noImplicitAny": false,
+      "noImplicitAny": true,
       "alwaysStrict": true,
-      "noImplicitReturns": true
+      "noImplicitReturns": true,
+      "sourceMap": true
     }
 }
