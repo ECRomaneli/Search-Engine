@@ -22,7 +22,7 @@ const BIGINT = 'bigint'
 interface Query {
     key: any
     value: any
-    type: string | void
+    type?: string
     operator?: Operator
     negated?: boolean
 }
@@ -38,7 +38,7 @@ class GroupQuery {
 
     constructor() {
         this.conditions = []
-        this.operator = undefined
+        this.operator = void 0
     }
 
     lastCondition(): Query | GroupQuery | undefined {
@@ -68,6 +68,7 @@ namespace Operator {
  */
 function search<T extends Record<string, any>>(objList: T[], queryStr: string, exclude?: string[]): T[] {
     if (!objList) { return [] }
+    
     if (!queryStr || queryStr.trim() === EMPTY_STR) { return objList.slice() }
 
     return [...evaluateConditions(objList, extractConditionsFromQuery(queryStr.toLowerCase()), exclude)]
@@ -82,22 +83,22 @@ function extractConditionsFromQuery(query: string, regex = new RegExp(TOKENIZER)
         }
 
         let key = m[TOKEN.KEY]
-        let value = m[TOKEN.QUOTED_VALUE] || undefined
+        let value = m[TOKEN.QUOTED_VALUE] || void 0
 
-        if (key === undefined) {
-            key = value !== undefined ? KEY_SEPARATOR : m[TOKEN.VALUE]
-        } else if (value === undefined) {
-            value = m[TOKEN.VALUE] !== EMPTY_QUOTES_STR ? m[TOKEN.VALUE] : undefined
+        if (key === void 0) {
+            key = value !== void 0 ? KEY_SEPARATOR : m[TOKEN.VALUE]
+        } else if (value === void 0) {
+            value = m[TOKEN.VALUE] !== EMPTY_QUOTES_STR ? m[TOKEN.VALUE] : void 0
         }
 
         if (key || value) {
-            const type = m[TOKEN.TYPE] && m[TOKEN.TYPE] !== TOKEN_SEPARATOR ? m[TOKEN.TYPE].charAt(0) : undefined
+            const type = m[TOKEN.TYPE] && m[TOKEN.TYPE] !== TOKEN_SEPARATOR ? m[TOKEN.TYPE].charAt(0) : void 0
             group.conditions.push(getQuery(!!m[TOKEN.NEGATED], type, key, value))
         }
 
         if (m[TOKEN.OPERATOR] === GROUP_END) {
             m[TOKEN.GROUP_END] = GROUP_END
-            m[TOKEN.OPERATOR] = undefined
+            m[TOKEN.OPERATOR] = void 0
         }
 
         if (m[TOKEN.GROUP_END]) {
@@ -111,7 +112,7 @@ function extractConditionsFromQuery(query: string, regex = new RegExp(TOKENIZER)
     return group
 }
 
-function getQuery(negated: boolean, type: string | void, key: string | void, value: string | void): Query {
+function getQuery(negated: boolean, type?: string, key?: string, value?: string): Query {
 
     const query: Query = { negated, key: removeEscapeChar(key), type, value: removeEscapeChar(value) }
 
@@ -140,9 +141,9 @@ function getQuery(negated: boolean, type: string | void, key: string | void, val
         return query
     }
 
-    query.value = { min: parseFloat(matches[1]) || undefined, max: parseFloat(matches[3]) || undefined }
+    query.value = { min: parseFloat(matches[1]) || void 0, max: parseFloat(matches[3]) || void 0 }
 
-    if (query.value.min === undefined && query.value.max === undefined) {
+    if (query.value.min === void 0 && query.value.max === void 0) {
         delete query.type
         delete query.value
     }
@@ -181,18 +182,18 @@ function evaluateCondition<T>(objList: T[], condition: Query | GroupQuery, exclu
     return resultSet
 }
 
-function findQuery(obj: any, query: Query, nestedKeys: string, excludedKeys?: string[], keyFound?: boolean): boolean {
+function findQuery(obj: Object, query: Query, nestedKeys: string, excludedKeys?: string[], keyFound?: boolean): boolean {
     return getObjectKeys(obj).some((key) => {
         const newNestedKeys = nestedKeys + KEY_SEPARATOR + key.toLowerCase()
 
         if (isExcluded(newNestedKeys, excludedKeys)) { return false }
         
-        if (keyFound === undefined) {
+        if (keyFound === void 0) {
             if (newNestedKeys.indexOf(query.key!) === UNKNOWN) {
                 return findQuery(obj[key], query, newNestedKeys, excludedKeys)
             }
 
-            if (query.value === undefined) { return true }
+            if (query.value === void 0) { return true }
         }
 
         return match(query.value, obj[key], query.type) || 
@@ -200,8 +201,8 @@ function findQuery(obj: any, query: Query, nestedKeys: string, excludedKeys?: st
     })
 }
 
-function match(expectedValue: any, value: any, type: string | void): boolean {
-    if (value === null || value === undefined) { return false }
+function match(expectedValue: any, value: any, type?: string): boolean {
+    if (value === null || value === void 0) { return false }
     
     const typeOf = typeof value
 
@@ -224,10 +225,10 @@ function match(expectedValue: any, value: any, type: string | void): boolean {
 }
 
 function matchRange(expectedRange: Range, numValue: number): boolean {
-    if (expectedRange.min !== undefined && expectedRange.max !== undefined) {
+    if (expectedRange.min !== void 0 && expectedRange.max !== void 0) {
         return numValue >= expectedRange.min && numValue <= expectedRange.max
     } 
-    if (expectedRange.min !== undefined) { return numValue >= expectedRange.min }
+    if (expectedRange.min !== void 0) { return numValue >= expectedRange.min }
     return numValue <= expectedRange.max
 }
 
@@ -235,11 +236,11 @@ function isExcluded(nestedKeys: string, excludedKeys?: string[]): boolean {
     return !!excludedKeys && excludedKeys.some((key) => nestedKeys.endsWith(key))
 }
 
-function getObjectKeys(obj: any): string[] {
+function getObjectKeys(obj: Object): string[] {
     return obj instanceof Object ? Object.keys(obj) : EMPTY_ARR
 }
 
-function removeEscapeChar(str: string | void): string | void {    
+function removeEscapeChar(str?: string): string | void {    
     return str ? str.replace(/\\(.)/g, '$1') : str
 }
 
