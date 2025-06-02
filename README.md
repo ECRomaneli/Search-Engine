@@ -67,7 +67,7 @@ const users = [
 ]
 
 // Simple search
-const result1 = search(users, 'john')  // Find users with "john" in any field
+const result1 = search(users, '"john"')  // Find users with "john" in any field
 
 // Field-specific search
 const result2 = search(users, 'name:jane')  // Find users with "jane" in the name field
