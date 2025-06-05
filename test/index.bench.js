@@ -263,7 +263,7 @@ function runSearchBenchmark() {
     // Implementations to benchmark
     const implementations = {
         "Static": SearchEngine.search,
-        "Constructor": instance.search.bind(instance)
+        "Constructor": (...args) => instance.search(...args)
         
         // Add alternative implementations to compare:
         // "Alternative": alternativeSearch,
