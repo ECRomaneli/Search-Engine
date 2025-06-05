@@ -72,10 +72,12 @@ cat > dist/web/search-engine.js << EOF
     
     // Self-executing function to create a contained scope
     const SearchEngine = (function() {
-        $(cat dist/npm/index.js | grep -v "module.exports" | grep -v "exports." | grep -v "require(")
+        const exports = {};
+        
+        $(cat dist/npm/index.js | grep -v "module.exports" | grep -v "require(")
         
         // Return public API
-        return { search };
+        return exports.default;
     })();
     
     // Expose to global environment
