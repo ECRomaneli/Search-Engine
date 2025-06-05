@@ -318,3 +318,5 @@ function removeEscapeChar(str?: string): string | void {
 }
 
 export default SearchEngine
+
+module && (module.exports = SearchEngine)

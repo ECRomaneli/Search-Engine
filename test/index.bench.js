@@ -257,7 +257,7 @@ function runSearchBenchmark() {
         '(details.color*:^g or description:\"searchable content\" and not price~:0-100) or ("red" and not (age:45 or tags:golang)) or (tag2 and not (name:item))'
     ]
 
-    const SearchEngine = require('../dist/npm/index.js').default
+    const SearchEngine = require('../dist/npm/index.js')
     const instance = new SearchEngine({ includeValuesInKeySearch: false, allowNumericString: false })
     
     // Implementations to benchmark

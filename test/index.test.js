@@ -1,4 +1,4 @@
-const Search = require('../dist/npm/index').default
+const Search = require('../dist/npm/index')
 
 describe('Search Engine', () => {
     // Test dataset with variety of data types, nested objects, and arrays
