@@ -256,10 +256,14 @@ function runSearchBenchmark() {
         "tags*:.tag+ and details.weight~:0-5",
         '(details.color*:^g or description:\"searchable content\" and not price~:0-100) or ("red" and not (age:45 or tags:golang)) or (tag2 and not (name:item))'
     ]
+
+    const SearchEngine = require('../dist/npm/index.js').default
+    const instance = new SearchEngine({ includeValuesInKeySearch: !false, excludeNumericStrings: !true })
     
     // Implementations to benchmark
     const implementations = {
-        "Original": search,  // The original search implementation
+        "Static": SearchEngine.search,
+        "Constructor": instance.search.bind(instance)
         
         // Add alternative implementations to compare:
         // "Alternative": alternativeSearch,
@@ -270,10 +274,9 @@ function runSearchBenchmark() {
         implementations,
         datasets: [smallDataset, largeDataset],
         queries,
-        iterations: 300,
+        iterations: 50,
         warmup: true
     })
 }
 
-const { search } = require('../dist/npm/index.js')
 runSearchBenchmark()
