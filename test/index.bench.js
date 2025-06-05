@@ -258,11 +258,11 @@ function runSearchBenchmark() {
     ]
 
     const SearchEngine = require('../dist/npm/index.js').default
-    const instance = new SearchEngine({ includeValuesInKeySearch: !false, excludeNumericStrings: !true })
+    const instance = new SearchEngine({ includeValuesInKeySearch: false, allowNumericString: false })
     
     // Implementations to benchmark
     const implementations = {
-        "Static": SearchEngine.search,
+        "Static": (...args) => SearchEngine.search(...args),
         "Constructor": (...args) => instance.search(...args)
         
         // Add alternative implementations to compare:

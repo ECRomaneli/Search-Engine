@@ -12,7 +12,6 @@ const RANGE_REGEXP = /^[^-\d]*(-?\d+(\.\d+)?)?[^-\d]*-[^-\d]*(-?\d+(\.\d+)?)?[^-
 const TOKENIZER = new RegExp(` *(${NEGATED_PREFIX})? *(\\${GROUP_START})| *(${NEGATED_PREFIX} +)?(?:((?:\\\\.|[^ ${GROUP_START}${GROUP_END}\\\\${REGEX_CHAR}${RANGE_CHAR}${TOKEN_SEPARATOR}])+) *([${REGEX_CHAR}${RANGE_CHAR}]?${TOKEN_SEPARATOR}))? *("((?:\\\\.|[^"\\\\])+)"|(?:\\\\.|[^ ${GROUP_START}${GROUP_END}\\\\])+)? *(and|or|\\${GROUP_END}|$)`, 'g')
 const TOKEN = { GROUP_NEGATED: 1, GROUP_START: 2, NEGATED: 3, KEY: 4, TYPE: 5, VALUE: 6, QUOTED_VALUE: 7, OPERATOR: 8 }
 const UNKNOWN = -1
-const EMPTY_ARR: any[] = []
 const EMPTY_OBJ: any = {}
 const EMPTY_STR = ''
 const STRING = 'string'
@@ -63,14 +62,29 @@ namespace Operator {
 interface SearchOptions {
     /** Array of keys to exclude from search. */
     excludeKeys?: string[],
-    /** Whether to consider numeric strings in the range search. Disabling improves range search performance. Default is true.  */
+    /** Whether to consider numeric strings in the range search. 
+     * Disabling improves range search performance. 
+     * 
+     * Default is true.  */
     allowNumericString?: boolean
-    /** Whether to match keys and values when no quotes are used in the query and no value is provided. Disabling improves key search performance. Default is true.
+    /** Whether to match keys and values when no quotes are used in the query and no value is provided. 
+     * Disabling improves key search performance. 
+     * 
+     * Default is true.
      * @example 
      * The query "foo" (no quotes), will match "foo: anyValue" and "anyField: foo".
      * The query "foo:bar" has a value and will not be affected by this option.
      */
     allowKeyValueMatching?: boolean
+    /** If true, once the key is found, child object keys will be considered as possible values. 
+     * Disabling improves value search performance. 
+     * 
+     * Default is false.
+     * @example
+     * If true, "foo:bar" => [{ foo: 'bar' }, { foo: { bar: 'dummy' } }]
+     * Else, "foo:bar" => [{ foo: 'bar' }]
+     */
+    matchChildKeysAsValues?: boolean
 }
 
 /**
@@ -85,8 +99,6 @@ class SearchEngine {
      * @param options - Search options
      */
     constructor(options: SearchOptions = {}) {
-        options.allowNumericString === void 0 && (options.allowNumericString = true)
-        options.allowKeyValueMatching === void 0 && (options.allowKeyValueMatching = true)
         this.#options = options
     }
 
@@ -98,9 +110,7 @@ class SearchEngine {
      * @returns Array of matched objects
      */
     search<T extends Record<string, any>>(objList: T[], queryStr: string): T[] {
-        if (!objList) { return [] }
-        if (!queryStr || queryStr.trim() === EMPTY_STR) { return objList.slice() }
-        return [...this.#evaluateGroup(new Set(objList), extractConditionsFromQuery(queryStr.toLowerCase()))]
+        return SearchEngine.search(objList, queryStr, this.#options)
     }
 
     /**
@@ -112,70 +122,76 @@ class SearchEngine {
      * @returns Array of matched objects
      */
     static search<T extends Record<string, any>>(objList: T[], queryStr: string, options: SearchOptions = EMPTY_OBJ): T[] {
-        return (new SearchEngine(options)).search(objList, queryStr)
+        if (!objList) { return [] }
+        if (!queryStr || queryStr.trim() === EMPTY_STR) { return objList.slice() }
+        options.allowNumericString === void 0 && (options.allowNumericString = true)
+        options.allowKeyValueMatching === void 0 && (options.allowKeyValueMatching = true)
+        return [...evaluateGroup(new Set(objList), extractConditionsFromQuery(queryStr.toLowerCase()), options)]
     }
+}
 
-    #evaluateGroup<T>(objList: Set<T>, group: GroupQuery): Set<T> {
-        if (group.conditions.length === 0) { return group.negated ? new Set() : objList }
+function evaluateGroup<T>(objList: Set<T>, group: GroupQuery, options: SearchOptions): Set<T> {
+    if (group.conditions.length === 0) { return group.negated ? new Set() : objList }
+    
+    let currentResults = evaluateCondition(objList, group.conditions[0], options)
+    
+    for (let i = 1; i < group.conditions.length; i++) {
+        const condition = group.conditions[i]
+        const previousOperator = group.conditions[i - 1].operator
         
-        let currentResults = this.#evaluateCondition(objList, group.conditions[0])
-        
-        for (let i = 1; i < group.conditions.length; i++) {
-            const condition = group.conditions[i]
-            const previousOperator = group.conditions[i - 1].operator
-            
-            if (previousOperator && previousOperator === Operator.OR) {
-                const nextResults = this.#evaluateCondition(objList, condition)
-                nextResults.forEach(item => currentResults.add(item))
-            } else {
-                currentResults = this.#evaluateCondition(currentResults, condition)
-            }
+        if (previousOperator && previousOperator === Operator.OR) {
+            const nextResults = evaluateCondition(objList, condition, options)
+            for (const item of nextResults) { currentResults.add(item) }
+        } else {
+            currentResults = evaluateCondition(currentResults, condition, options)
         }
-        
-        if (!group.negated) { return currentResults }
-    
-        // If the group is negated, return everything except the group results
-        const negatedResult = new Set<T>()
-        for (const obj of objList) { currentResults.has(obj) || negatedResult.add(obj) }
-        return negatedResult
     }
     
-    #evaluateCondition<T>(objList: Set<T>, condition: Query | GroupQuery): Set<T> {
-        if ('conditions' in condition) { return this.#evaluateGroup(objList, condition) }
-        
-        const resultSet = new Set<T>()
-        objList.forEach(obj => {
-            if (condition.negated !== this.#findQuery(obj, condition, EMPTY_STR)) {
-                resultSet.add(obj)
-            }
-        })
-        return resultSet
-    }
+    if (!group.negated) { return currentResults }
+
+    // If the group is negated, return everything except the group results
+    const negatedResult = new Set<T>()
+    for (const obj of objList) { currentResults.has(obj) || negatedResult.add(obj) }
+    return negatedResult
+}
+
+function evaluateCondition<T>(objList: Set<T>, condition: Query | GroupQuery, options: SearchOptions): Set<T> {
+    if ('conditions' in condition) { return evaluateGroup(objList, condition, options) }
     
-    #findQuery(obj: any, query: Query, nestedKeys: string, keyFound?: boolean): boolean {
-        const keys = getObjectKeys(obj)
-        nestedKeys += KEY_SEPARATOR
-        for (const key of keys) {
-            const newNestedKeys = nestedKeys + key.toLowerCase()
-    
-            if (isExcluded(newNestedKeys, this.#options.excludeKeys)) { continue }
-    
-            if (keyFound === void 0) {
-                if (newNestedKeys.indexOf(query.key) === UNKNOWN) {
-                    if (this.#findQuery(obj[key], query, newNestedKeys)) { return true }
-                    if (this.#options.allowKeyValueMatching && query.value === void 0 && match(query.key, obj[key], query.type, this.#options)) { return true }
-                    continue
-                }
-    
-                if (query.value === void 0) { return true }
-            }
-    
-            if (match(query.value, obj[key], query.type, this.#options) || this.#findQuery(obj[key], query, newNestedKeys, true)) {
-                return true
-            }
+    const resultSet = new Set<T>()
+    for (const obj of objList) {
+        if (condition.negated !== findQuery(obj, condition, EMPTY_STR, options)) {
+            resultSet.add(obj)
         }
-        return false
     }
+    return resultSet
+}
+
+function findQuery(obj: any, query: Query, nestedKeys: string, options: SearchOptions, keyFound?: boolean): boolean {
+    if (obj === null || obj === void 0 || typeof obj !== OBJECT) { return false }
+    const keys = Object.keys(obj)
+
+    nestedKeys += KEY_SEPARATOR
+    for (const key of keys) {
+        const newNestedKeys = nestedKeys + key.toLowerCase()
+
+        if (isExcluded(newNestedKeys, options.excludeKeys)) { continue }
+
+        if (keyFound === void 0) {
+            if (newNestedKeys.indexOf(query.key) === UNKNOWN) {
+                if (findQuery(obj[key], query, newNestedKeys, options)) { return true }
+                if (options.allowKeyValueMatching && query.value === void 0 && match(query.key, obj[key], query.type, options)) { return true }
+                continue
+            }
+
+            if (query.value === void 0) { return true }
+        }
+
+        if (match(query.value, obj[key], query.type, options) || findQuery(obj[key], query, newNestedKeys, options, true)) {
+            return true
+        }
+    }
+    return false
 }
 
 function extractConditionsFromQuery(query: string, regex = new RegExp(TOKENIZER), group = new GroupQuery()): GroupQuery {
@@ -255,6 +271,15 @@ function match(expectedValue: any, value: any, type: string, options: SearchOpti
     
     const typeOf = typeof value
 
+    if (typeOf === OBJECT) {
+        if (options.matchChildKeysAsValues) {
+            for (const v of Object.keys(value)) {
+                if (match(expectedValue, v, type, options)) { return true }
+            }
+        }
+        return false
+    }
+
     if (type === RANGE_CHAR) {
         if (typeOf !== NUMBER && typeOf !== BIGINT && !(options.allowNumericString && typeOf === STRING && !isNaN(value = +value))) { return false }
         return matchRange(expectedValue as Range, value)
@@ -282,11 +307,10 @@ function matchRange(expectedRange: Range, numValue: number): boolean {
 }
 
 function isExcluded(nestedKeys: string, excludedKeys?: string[]): boolean {
-    return !!excludedKeys && excludedKeys.some((key) => nestedKeys.endsWith(key))
-}
-
-function getObjectKeys(obj: Object): string[] {
-    return typeof obj === OBJECT && obj !== null ? Object.keys(obj) : EMPTY_ARR
+    if (excludedKeys) {
+        for (const key of excludedKeys) { if (nestedKeys.endsWith(key)) { return true } }
+    }
+    return false
 }
 
 function removeEscapeChar(str?: string): string | void {    

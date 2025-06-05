@@ -149,6 +149,12 @@ describe('Search Engine', () => {
             expect(results[0].id).toBe(2)
             expect(results[1].id).toBe(4)
         })
+
+        test('Avoid object parse to string [object Object]', () => {
+            const query = 'contact*:object'  // Matches emails with alice or jane
+            const results = Search.search(testData, query)
+            expect(results.length).toBe(0)
+        })
     })
 
     // 4. Numeric range searches
@@ -331,6 +337,7 @@ describe('Search Engine', () => {
             const results = Search.search(testData, query, { allowNumericString: false })
             expect(results.length).toBe(0)
         })
+        
         test('Quoted values with spaces', () => {
             const query = 'name:"John Smith"'
             const results = Search.search(testData, query)
@@ -400,6 +407,20 @@ describe('Search Engine', () => {
             expect(results[0].id).toBe(4)
         })
 
+        test('Child keys as values', () => {
+            let query = 'contact: zip'
+            let results = Search.search(testData, query, { matchChildKeysAsValues: true })
+            expect(results.length).toBe(3)
+            expect(results[0].id).toBe(3)
+            expect(results[1].id).toBe(4)
+            expect(results[2].id).toBe(5)
+
+            query = 'not contact: zip'
+            results = Search.search(testData, query, { matchChildKeysAsValues: true })
+            expect(results.length).toBe(testData.length - 3)
+            expect(!results.some(r => [3, 4, 5].includes(r.id))).toBe(true)
+        })
+
         test('Include values in key search', () => {
             const query = "skill_level"
             const results = Search.search(testData, query)
@@ -423,7 +444,7 @@ describe('Search Engine', () => {
     })
 
     describe('All features together', () => {
-        test('Combined search with all features', () => {
+        test('Combined search with all features and no pattern', () => {
             // This complex query combines:
             // - Regex pattern matching (name*:^J)
             // - Range searches (age~:25-35)
@@ -437,9 +458,8 @@ describe('Search Engine', () => {
             const query = `
                 (name*:^J and age~:25-35 and not tags:manager) 
                 or 
-                ("developer" and not (age:45 or tags:golang)) 
-                or 
-                (skill_level and not (active:false))
+                ((("developer"and not(age :  45 or tags:golang)) ))
+                or(skill_level and not (active:false))
             `.replace(/\n/g, ' ').trim()
             
             const results = Search.search(testData, query)
@@ -481,7 +501,7 @@ describe('Search Engine', () => {
             expect(results.some(r => r.id === 6)).toBe(false)
             
             // Verify the breakdown of matching conditions:
-            const exactQuery = "(name*:^[JB] or age~:32-45) or (\"developer\" or active:true)"
+            const exactQuery = '(name*:^[JB] or age~:32-45) or ("developer" or active:true)'
             const exactResults = Search.search(testData, exactQuery)
             expect(exactResults.length).toBe(5)
             expect(JSON.stringify(results.map(r => r.id).sort()))
