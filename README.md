@@ -30,7 +30,7 @@ npm install @ecromaneli/search-engine
 ## Basic Usage
 
 ```javascript
-const { SearchEngine } = require('@ecromaneli/search-engine')
+const SearchEngine = require('@ecromaneli/search-engine')
 
 const users = [
   { id: 1, name: 'John Doe', age: 28, tags: ['developer', 'javascript'] },
@@ -76,11 +76,11 @@ The `SearchOptions` object allows you to customize the behavior of the search en
   - When `false`, only actual numbers will be considered for range searches.
 
 - **`allowKeyValueMatching`**:
-  - When `true`, a query like `"admin"` will match both `{ admin: "value" }` and `{ key: "admin" }`.
+  - When `true`, a query like `admin` will match both `{ admin: "value" }` and `{ key: "admin" }`.
   - When `false`, it will only match field names or values explicitly.
 
 - **`matchChildKeysAsValues`**:
-  - When `true`, a query like `"foo:bar"` will match both `{ foo: "bar" }` and `{ foo: { bar: "value" } }`.
+  - When `true`, a query like `foo:bar` will match both `{ foo: "bar" }` and `{foo: { bar: "value" }}`.
   - When `false`, it will only match `{ foo: "bar" }`.
 
 ## Query Syntax Reference
