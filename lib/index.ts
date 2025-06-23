@@ -12,7 +12,6 @@ const RANGE_REGEXP = /^[^-\d]*(-?\d+(\.\d+)?)?[^-\d]*-[^-\d]*(-?\d+(\.\d+)?)?[^-
 const TOKENIZER = new RegExp(` *(${NEGATED_PREFIX})? *(\\${GROUP_START})| *(${NEGATED_PREFIX} +)?(?:((?:\\\\.|[^ ${GROUP_START}${GROUP_END}\\\\${REGEX_CHAR}${RANGE_CHAR}${TOKEN_SEPARATOR}])+) *([${REGEX_CHAR}${RANGE_CHAR}]?${TOKEN_SEPARATOR}))? *("((?:\\\\.|[^"\\\\])+)"|(?:\\\\.|[^ ${GROUP_START}${GROUP_END}\\\\])+)? *(and|or|\\${GROUP_END}|$)`, 'g')
 const TOKEN = { GROUP_NEGATED: 1, GROUP_START: 2, NEGATED: 3, KEY: 4, TYPE: 5, VALUE: 6, QUOTED_VALUE: 7, OPERATOR: 8 }
 const UNKNOWN = -1
-const EMPTY_OBJ: any = {}
 const EMPTY_STR = ''
 const STRING = 'string'
 const NUMBER = 'number'
@@ -121,7 +120,7 @@ class SearchEngine {
      * @param options - Search options
      * @returns Array of matched objects
      */
-    static search<T extends Record<string, any>>(objList: T[], queryStr: string, options: SearchOptions = EMPTY_OBJ): T[] {
+    static search<T extends Record<string, any>>(objList: T[], queryStr: string, options: SearchOptions = {}): T[] {
         if (!objList) { return [] }
         if (!queryStr || queryStr.trim() === EMPTY_STR) { return objList.slice() }
         options.allowNumericString === void 0 && (options.allowNumericString = true)
