@@ -48,7 +48,7 @@ You can create a `SearchEngine` instance with specific options that will be used
 
 ```javascript
 const engine = new SearchEngine({
-  excludeKeys: ['password', 'private.info'],
+  excludeKeys: ['name', 'tags'],
   allowNumericString: false,
   allowKeyValueMatching: true,
   matchChildKeysAsValues: false
