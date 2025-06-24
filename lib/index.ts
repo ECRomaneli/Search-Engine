@@ -5,12 +5,12 @@ const REGEX_CHAR = '*'
 const RANGE_CHAR = '~'
 const GROUP_START = '('
 const GROUP_END = ')'
-const QUOTES = '"'
-const EMPTY_QUOTES_STR = '""'
+const VAL_TOKEN = '"'
+const EMPTY_VAL_GROUP = `${VAL_TOKEN}${VAL_TOKEN}`
 const KEY_SEPARATOR = '.'
 const NEGATED_PREFIX = 'not'
 const RANGE_REGEXP = /^[^-\d]*(-?\d+(\.\d+)?)?[^-\d]*-[^-\d]*(-?\d+(\.\d+)?)?[^-\d]*$/
-const TOKENIZER = new RegExp(` *(${NEGATED_PREFIX})? *(\\${GROUP_START})| *(${NEGATED_PREFIX} +)?(?:((?:\\\\.|[^ ${GROUP_START}${GROUP_END}\\\\${REGEX_CHAR}${RANGE_CHAR}${TOKEN_SEPARATOR}])+) *([${REGEX_CHAR}${RANGE_CHAR}]?${TOKEN_SEPARATOR}))? *(${QUOTES}((?:\\\\.|[^${QUOTES}\\\\])+)${QUOTES}?|(?:\\\\.|[^ ${GROUP_START}${GROUP_END}\\\\])+)? *(and|or|\\${GROUP_END}|$)`, 'g')
+const TOKENIZER = new RegExp(` *(${NEGATED_PREFIX})? *(\\${GROUP_START})| *(${NEGATED_PREFIX} +)?(?:((?:\\\\.|[^ ${GROUP_START}${GROUP_END}\\\\${REGEX_CHAR}${RANGE_CHAR}${TOKEN_SEPARATOR}])+) *([${REGEX_CHAR}${RANGE_CHAR}]?${TOKEN_SEPARATOR}))? *(${VAL_TOKEN}((?:\\\\.|[^${VAL_TOKEN}\\\\])+)${VAL_TOKEN}?|(?:\\\\.|[^ ${GROUP_START}${GROUP_END}\\\\])+)? *(and|or|\\${GROUP_END}|$)`, 'g')
 const TOKEN = { GROUP_NEGATED: 1, GROUP_START: 2, NEGATED: 3, KEY: 4, TYPE: 5, VALUE: 6, QUOTED_VALUE: 7, OPERATOR: 8 }
 const UNKNOWN = -1
 const EMPTY_STR = ''
@@ -208,9 +208,9 @@ function extractConditionsFromQuery(query: string, regex = new RegExp(TOKENIZER)
         let value = m[TOKEN.QUOTED_VALUE] || void 0
 
         if (key === void 0) {
-            key = value !== void 0 ? KEY_SEPARATOR : m[TOKEN.VALUE]
+            key = value !== void 0 ? KEY_SEPARATOR : getUnquotedValue(m[TOKEN.VALUE])
         } else if (value === void 0) {
-            value = m[TOKEN.VALUE] !== EMPTY_QUOTES_STR ? m[TOKEN.VALUE] : void 0
+            value = getUnquotedValue(m[TOKEN.VALUE])
         }
 
         if (key || value) {
@@ -315,6 +315,10 @@ function isExcluded(nestedKeys: string, excludedKeys?: string[]): boolean {
 
 function removeEscapeChar(str?: string): string | void {    
     return str ? str.replace(/\\(.)/g, '$1') : str
+}
+
+function getUnquotedValue(value: string): string {
+    return value !== EMPTY_VAL_GROUP && value !== VAL_TOKEN ? value : void 0
 }
 
 export default SearchEngine

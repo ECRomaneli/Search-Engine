@@ -372,6 +372,18 @@ describe('Search Engine', () => {
             expect(results[0].id).toBe(1)
             expect(results[1].id).toBe(2)
         })
+
+        test('Empty partially quoted values', () => {
+            let query = 'name:"'
+            let results = Search.search(testData, query)
+            console.log(results)
+            expect(results.length).toBe(6)
+
+            query = '"'
+            results = Search.search(testData, query)
+            console.log(results)
+            expect(results.length).toBe(6) 
+        })
     
         test('Quoted values with boolean operators inside', () => {
             const query = 'name:"and"'  // Looking for literal "and" in name
