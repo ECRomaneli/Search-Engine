@@ -11,7 +11,8 @@ describe('Search Engine', () => {
             tags: ["developer", "javascript"],
             contact: {
                 email: "john.smith@example.com",
-                phone: "555-1234"
+                phone: "555-1234",
+                website: "https://example.com",
             }
         },
         {
@@ -371,6 +372,11 @@ describe('Search Engine', () => {
             expect(results.length).toBe(2)
             expect(results[0].id).toBe(1)
             expect(results[1].id).toBe(2)
+
+            query = '"John Smith" and "https:'
+            results = Search.search(testData, query)
+            expect(results.length).toBe(1)
+            expect(results[0].id).toBe(1)
         })
 
         test('Empty partially quoted values', () => {
