@@ -51,7 +51,8 @@ const engine = new SearchEngine({
   excludeKeys: ['name', 'tags'],
   allowNumericString: false,
   allowKeyValueMatching: true,
-  matchChildKeysAsValues: false
+  matchChildKeysAsValues: false,
+  maxLevels: 5
 })
 
 const results = engine.search(users, 'age~: 25-35')
@@ -68,6 +69,10 @@ The `SearchOptions` object allows you to customize the behavior of the search en
 | `allowNumericString`     | `boolean`  | `true`  | Controls whether string values that can be parsed as numbers are used in range searches.        |
 | `allowKeyValueMatching`  | `boolean`  | `true`  | When enabled, unquoted terms without a field/value separator match both field names and values. |
 | `matchChildKeysAsValues` | `boolean`  | `false` | When enabled, after finding a matching key, also looks for the value in child object keys.      |
+| `maxLevels`              | `number`   | unlimited | Maximum levels of nested objects to search through. Useful to avoid infinite loops in deeply nested or circular data. |
+
+### Notes
+- The `maxLevels` option can be set to limit how deep the search will go into nested objects. This is especially useful for large or circular data structures.
 
 ### Differences Between Options
 
@@ -98,7 +103,17 @@ The `SearchOptions` object allows you to customize the behavior of the search en
 - `field~: 10-` - Numbers greater than or equal to 10.
 - `field~: -20` - Numbers less than or equal to 20.
 
-Negative values are also supported.
+### "Is / Is Not" Operators
+
+- `field is value` - Search for objects where `field` is exactly `value`.
+- `field is not value` - Search for objects where `field` is not `value`.
+
+Where `value` must be one of the following:
+- A boolean (`true` or `false`)
+- `null`
+- `undefined` (or `undef`)
+- `blank` (empty strings)
+- `empty` (empty arrays)
 
 ### Boolean Operators
 
@@ -143,6 +158,7 @@ To store the options, use the constructor below:
 - Set `matchChildKeysAsValues: false` (default) unless you specifically need to match object keys as values.
 - Use `excludeKeys` to skip searching in fields that are never relevant to your searches.
 - For repeated searches with the same options, create a `SearchEngine` instance instead of using the static method.
+- Limit `maxLevels` if you have deeply nested data to avoid performance issues.
 
 ## Examples and Advanced Usage
 

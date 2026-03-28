@@ -8,6 +8,7 @@ describe('Search Engine', () => {
             name: "John Smith",
             age: 30,
             active: true,
+            isTrial: null,
             tags: ["developer", "javascript"],
             contact: {
                 email: "john.smith@example.com",
@@ -20,6 +21,7 @@ describe('Search Engine', () => {
             name: "Jane Doe",
             age: 25,
             active: true,
+            isTrial: false,
             tags: ["designer", "ui/ux"],
             contact: {
                 email: "jane.doe@example.com",
@@ -31,7 +33,8 @@ describe('Search Engine', () => {
             name: "Bob Johnson",
             age: 45,
             active: false,
-            tags: ["manager", "sales"],
+            isTrial: true,
+            tags: [],
             contact: {
                 email: "bob.johnson@example.com",
                 phone: "555-9012",
@@ -43,6 +46,7 @@ describe('Search Engine', () => {
             name: "Alice Williams",
             age: 28,
             active: true,
+            isTrial: undefined,
             tags: ["developer", "python"],
             issues: ["skill_level"],
             contact: {
@@ -59,6 +63,7 @@ describe('Search Engine', () => {
             name: "Charlie Brown",
             age: 35,
             active: false,
+            isTrial: '',
             tags: ["designer", "graphic"],
             skill_level: 9,
             contact: {
@@ -73,7 +78,8 @@ describe('Search Engine', () => {
             age: 31,
             score: -5,
             active: false,
-            tags: ["intern", "golang"],
+            isTrial: true,
+            tags: ["intern", "golang", ["ui", "ux"]],
             "a5(d00)+~*:~": "uncommon key"
         }
     ]
@@ -90,7 +96,7 @@ describe('Search Engine', () => {
     // 1. Boolean operators tests
     describe('Boolean Operators', () => {
         test('AND operator', () => {
-            const query = "active:true and age:30"
+            const query = "active is true and age:30"
             const results = Search.search(testData, query)
             expect(results.length).toBe(1)
             expect(results[0].id).toBe(1)
@@ -105,7 +111,7 @@ describe('Search Engine', () => {
         })
 
         test('Multiple AND/OR operators', () => {
-            const query = "active:true and (age:25 or age:30)"
+            const query = "active is true and (age:25 or age:30)"
             const results = Search.search(testData, query)
             expect(results.length).toBe(2)
             expect(results.some(r => r.id === 1)).toBe(true)
@@ -124,7 +130,7 @@ describe('Search Engine', () => {
         })
 
         test('Search by multiple fields', () => {
-            const query = "active:true and tags:developer"
+            const query = "active is true and tags:developer"
             const results = Search.search(testData, query)
             expect(results.length).toBe(2)
             expect(results[0].id).toBe(1)
@@ -155,6 +161,56 @@ describe('Search Engine', () => {
             const query = 'contact*:object'  // Matches emails with alice or jane
             const results = Search.search(testData, query)
             expect(results.length).toBe(0)
+        })
+    })
+
+    describe('Special matches handling', () => {
+        test('True statement', () => {
+            const query = "isTrial is true"
+            const results = Search.search(testData, query)
+            expect(results.length).toBe(2)
+        })
+
+        test('False statement', () => {
+            const query = "isTrial is not true"
+            const results = Search.search(testData, query)
+            expect(results.length).toBe(4)
+        })
+
+        test('Null statement', () => {
+            const query = "isTrial is null"
+            const results = Search.search(testData, query)
+            expect(results.length).toBe(1)
+            expect(results[0].id).toBe(1)
+        })
+
+        test('Undefined statement', () => {
+            const query = "isTrial is undef"
+            const results = Search.search(testData, query)
+            expect(results.length).toBe(1)
+            expect(results[0].id).toBe(4)
+        })
+
+        test('Blank string statement', () => {
+            const query = "isTrial is blank"
+            const results = Search.search(testData, query)
+            expect(results.length).toBe(1)
+            expect(results[0].id).toBe(5)
+        })
+
+        test('Empty array statement', () => {
+            const query = "tags is empty"
+            const results = Search.search(testData, query)
+            expect(results.length).toBe(1)
+            expect(results[0].id).toBe(3)
+        })
+
+        test('Special match fallback', () => {
+            const query = "name is john"
+            const results = Search.search(testData, query)
+            expect(results.length).toBe(2)
+            expect(results[0].id).toBe(1)
+            expect(results[1].id).toBe(3)
         })
     })
 
@@ -221,7 +277,7 @@ describe('Search Engine', () => {
     // 5. Logical negation
     describe('Logical negation', () => {
         test('Simple negation', () => {
-            const query = "not active:true"
+            const query = "not active is true"
             const results = Search.search(testData, query)
             expect(results.length).toBe(3)
             expect(results[0].id).toBe(3)
@@ -230,7 +286,7 @@ describe('Search Engine', () => {
         })
 
         test('Negation with other conditions', () => {
-            const query = "not name:john and active:true"
+            const query = "not name:john and active is true"
             const results = Search.search(testData, query)
             expect(results.length).toBe(2)
             expect(results[0].id).toBe(2)
@@ -238,7 +294,7 @@ describe('Search Engine', () => {
         })
 
         test('Negation of groups', () => {
-            const query = "not(not(not((name:john or not active:true))))"
+            const query = "not(not(not((name:john or not active is true))))"
             const results = Search.search(testData, query)
             expect(results.length).toBe(2)
             expect(results[0].id).toBe(2)
@@ -282,6 +338,13 @@ describe('Search Engine', () => {
             expect(results.length).toBe(1)
             expect(results[0].id).toBe(1)
         })
+
+        test('Array length search', () => {
+            const query = "tags.length: 3"
+            const results = Search.search(testData, query)
+            expect(results.length).toBe(1)
+            expect(results[0].id).toBe(6)
+        })
     })
 
     // 7. Logical grouping with parentheses
@@ -303,7 +366,7 @@ describe('Search Engine', () => {
         })
 
         test('Nested grouping', () => {
-            const query = "active:true and (age~:25-30 or tags:python)"
+            const query = "active is true and (age~:25-30 or tags:python)"
             const results = Search.search(testData, query)
             expect(results.length).toBe(3)
             expect(results.some(r => r.id === 1)).toBe(true)
@@ -312,7 +375,7 @@ describe('Search Engine', () => {
         })
 
         test('Complex expression', () => {
-            const query = 'not (not active:"true" or not (not(not age~:"25-30"))) or((((not active:true))) and ((((age:35)))))'
+            const query = 'not (not active is true or not (not(not age~:"25-30"))) or((((active is not true))) and ((((age:35)))))'
             const results = Search.search(testData, query)
             expect(results.length).toBe(4)
             expect(results.some(r => r.id === 1)).toBe(true)
@@ -490,7 +553,7 @@ describe('Search Engine', () => {
                 (name*:^J and age~:25-35 and not tags:manager) 
                 or 
                 ((("developer"and not(age :  45 or tags:golang)) ))
-                or(skill_level and not (active:false))
+                or(skill_level and not (active is false))
             `.replace(/\n/g, ' ').trim()
             
             const results = Search.search(testData, query)
