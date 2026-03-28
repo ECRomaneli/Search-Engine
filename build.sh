@@ -51,7 +51,8 @@ mkdir -p dist/web
 
 # Step 1: Compile TypeScript to JavaScript
 echo -e "${GREEN}Compiling TypeScript...${NC}"
-npx tsc
+cd lib && npx tsc
+cd ..
 
 # # Step 2: Create npm version (CommonJS module)
 # echo -e "${GREEN}Creating npm version...${NC}"

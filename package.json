@@ -1,6 +1,6 @@
 {
     "name": "@ecromaneli/search-engine",
-    "version": "2.1.2",
+    "version": "3.0.0",
     "description": "A powerful object search engine with advanced query syntax",
     "files": [ "dist/npm/index.min.*", "dist/npm/index.d.ts", "LICENSE" ],
     "exports": {
@@ -37,8 +37,8 @@
     },
     "homepage": "https://github.com/ECRomaneli/Search-Engine#readme",
     "devDependencies": {
-        "jest": "^29.7.0",
-        "typescript": "^5.8.3",
+        "jest": "^30.3.0",
+        "typescript": "^6.0.2",
         "uglify-js": "^3.19.3"
     }
 }
