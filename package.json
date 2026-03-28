@@ -2,14 +2,17 @@
     "name": "@ecromaneli/search-engine",
     "version": "2.1.2",
     "description": "A powerful object search engine with advanced query syntax",
-    "main": "dist/npm/index.min.js",
-    "files": [ "dist/npm/index.min.*", "dist/npm/index.d.*", "LICENSE" ],
+    "files": [ "dist/npm/index.min.*", "dist/npm/index.d.ts", "LICENSE" ],
     "exports": {
-        ".": "./dist/npm/index.min.js"
+        ".": {
+            "types": "./dist/npm/index.d.ts",
+            "default": "./dist/npm/index.min.js"
+        }
     },
     "scripts": {
         "build": "./build.sh",
         "test": "jest",
+        "btest": "./build.sh && jest",
         "bench": "node ./test/index.bench.js"
     },
     "repository": {
