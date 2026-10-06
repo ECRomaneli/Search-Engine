@@ -11,9 +11,19 @@ A lightweight, powerful object search engine for JavaScript with advanced query 
 
 ## Installation
 
+Import using [NPM](https://www.npmjs.com/package/@ecromaneli/search-engine):
+
 ```bash
 npm install @ecromaneli/search-engine
 ``` 
+
+or download the [latest release](https://github.com/ECRomaneli/Search-Engine/releases/latest) version and import it manually:
+
+```html
+<script src="search-engine.min.js"></script>
+```
+
+No Dependencies. Works in Node.js and browsers.
 
 ## Features
 

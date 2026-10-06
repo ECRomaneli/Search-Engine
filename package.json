@@ -1,6 +1,6 @@
 {
     "name": "@ecromaneli/search-engine",
-    "version": "3.0.0",
+    "version": "4.0.0",
     "description": "A powerful object search engine with advanced query syntax",
     "files": [ "dist/npm/index.min.*", "dist/npm/index.d.ts", "LICENSE" ],
     "exports": {
