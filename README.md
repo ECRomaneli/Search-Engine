@@ -24,6 +24,7 @@ npm install @ecromaneli/search-engine
 - Logical negation of search terms
 - Nested property searching
 - Logical grouping with parentheses
+- Fuzzy (typo-tolerant) search with optional relevance sorting
 - Customizable search options
 - Zero dependencies
 
@@ -70,6 +71,7 @@ The `SearchOptions` object allows you to customize the behavior of the search en
 | `allowKeyValueMatching`  | `boolean`  | `true`  | When enabled, unquoted terms without a field/value separator match both field names and values. |
 | `matchChildKeysAsValues` | `boolean`  | `false` | When enabled, after finding a matching key, also looks for the value in child object keys.      |
 | `maxLevels`              | `number`   | unlimited | Maximum levels of nested objects to search through. Useful to avoid infinite loops in deeply nested or circular data. |
+| `fuzzy`                  | `boolean \| object` | `false` | Enables typo-tolerant matching of string values. See [Fuzzy Search](#fuzzy-search). |
 
 ### Notes
 - The `maxLevels` option can be set to limit how deep the search will go into nested objects. This is especially useful for large or circular data structures.
@@ -87,6 +89,54 @@ The `SearchOptions` object allows you to customize the behavior of the search en
 - **`matchChildKeysAsValues`**:
   - When `true`, a query like `foo:bar` will match both `{ foo: "bar" }` and `{foo: { bar: "value" }}`.
   - When `false`, it will only match `{ foo: "bar" }`.
+
+## Fuzzy Search
+
+Fuzzy search is disabled by default. Set `fuzzy: true` to enable it with the default settings, or pass an object to customize it:
+
+```javascript
+SearchEngine.search(users, 'name: jhon', { fuzzy: true })
+// => [{ id: 1, name: 'John Doe', ... }, { id: 3, name: 'Bob Johnson', ... }]
+
+const engine = new SearchEngine({
+  fuzzy: {
+    algorithm: 'damerau',
+    tolerance: 0.25,
+    maxDistance: 2,
+    minLength: 3,
+    sort: true
+  }
+})
+
+engine.search(users, 'name: jonh or tags: desinger')
+```
+
+| Option        | Type     | Default     | Description                                                                                                    |
+|---------------|----------|-------------|----------------------------------------------------------------------------------------------------------------|
+| `algorithm`   | `string` | `'damerau'` | Algorithm used to compare the terms with the values. See the list below.                                       |
+| `tolerance`   | `number` | `0.25`      | Fraction (0 to 1) of the term length that can be edited. E.g. `0.25` allows 1 edit for terms with 4 to 7 characters. |
+| `maxDistance` | `number` | unlimited   | Maximum number of edits allowed regardless of the term length.                                                 |
+| `minLength`   | `number` | `3`         | Terms shorter than this are matched exactly.                                                                   |
+| `sort`        | `boolean`| `false`     | Sorts the results by relevance (closest matches first). Ties keep the original order.                          |
+
+### Algorithms
+
+- **`damerau`**: Finds the term inside the value allowing insertions, deletions, substitutions and swaps of adjacent characters (each counts as 1 edit). Best for typos (`jhon` → `John`).
+- **`levenshtein`**: Same as `damerau`, but swapping two characters counts as 2 edits.
+- **`subsequence`**: The characters of the term must appear in the value in the same order, gaps allowed (`jsmth` → `John Smith`). Best for abbreviations. `tolerance` and `maxDistance` are ignored.
+
+The number of allowed edits is `min(maxDistance, floor(term length × tolerance))`.
+
+### Scope
+
+- Only plain value matches (`field: value`, `"value"` and bare terms like `jhon`) are fuzzy.
+- Field names, regex (`*:`), range (`~:`) and `is` / `is not` queries are always exact.
+- Values of type `number` are always exact (`age: 31` does not match `30`), while numeric strings are fuzzy (`zip: 10002` matches `"10001"`).
+- Exact matches are always checked first, so they are not slowed down.
+
+### Relevance Sorting
+
+When `sort` is `true`, each condition that is not negated adds a score from 0 to 1 to the object (1 for an exact match, less for each edit or gap). Objects are sorted by their total score, so objects that match more conditions, or match them more closely, come first.
 
 ## Query Syntax Reference
 
@@ -159,6 +209,7 @@ To store the options, use the constructor below:
 - Use `excludeKeys` to skip searching in fields that are never relevant to your searches.
 - For repeated searches with the same options, create a `SearchEngine` instance instead of using the static method.
 - Limit `maxLevels` if you have deeply nested data to avoid performance issues.
+- Fuzzy search only runs when an exact match fails, but it may still make searches noticeably slower on large datasets. Use `minLength` and `maxDistance` to limit its cost, and enable `sort` only when needed.
 
 ## Examples and Advanced Usage
 

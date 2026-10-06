@@ -602,4 +602,136 @@ describe('Search Engine', () => {
                 .toBe(JSON.stringify(exactResults.map(r => r.id).sort()))
         })
     })
+
+    describe('Fuzzy search', () => {
+        const ids = results => results.map(r => r.id)
+
+        test('Disabled by default', () => {
+            expect(ids(Search.search(testData, 'name: jhon'))).toEqual([])
+            expect(ids(Search.search(testData, 'name: jhon', { fuzzy: false }))).toEqual([])
+        })
+
+        test('Enabled with defaults (damerau)', () => {
+            expect(ids(Search.search(testData, 'name: jhon', { fuzzy: true }))).toEqual([1, 3])
+            expect(ids(Search.search(testData, 'name: wiliams', { fuzzy: true }))).toEqual([4])
+            expect(ids(Search.search(testData, 'name: charlei', { fuzzy: {} }))).toEqual([5])
+        })
+
+        test('Exact matches still work', () => {
+            expect(ids(Search.search(testData, 'name: john', { fuzzy: true }))).toEqual([1, 3])
+        })
+
+        test('Levenshtein does not treat transpositions as a single edit', () => {
+            expect(ids(Search.search(testData, 'name: jhon', { fuzzy: { algorithm: 'levenshtein' } }))).toEqual([])
+            expect(ids(Search.search(testData, 'name: wiliams', { fuzzy: { algorithm: 'levenshtein' } }))).toEqual([4])
+        })
+
+        test('Subsequence algorithm', () => {
+            expect(ids(Search.search(testData, 'name: jsmth', { fuzzy: { algorithm: 'subsequence' } }))).toEqual([1])
+            expect(ids(Search.search(testData, 'name: awlms', { fuzzy: { algorithm: 'subsequence' } }))).toEqual([4])
+            expect(ids(Search.search(testData, 'name: htimsj', { fuzzy: { algorithm: 'subsequence' } }))).toEqual([])
+        })
+
+        test('Tolerance', () => {
+            // 4 chars * 0.25 = 1 edit, 4 chars * 0.5 = 2 edits
+            expect(ids(Search.search(testData, 'name: jahn', { fuzzy: { tolerance: 0.25 } }))).toEqual([1, 2, 3])
+            expect(ids(Search.search(testData, 'name: jxxn', { fuzzy: { tolerance: 0.25 } }))).toEqual([])
+            expect(ids(Search.search(testData, 'name: jxxn', { fuzzy: { tolerance: 0.5 } }))).toEqual([1, 2, 3])
+            expect(ids(Search.search(testData, 'name: jhon', { fuzzy: { tolerance: 0 } }))).toEqual([])
+        })
+
+        test('Max distance', () => {
+            expect(ids(Search.search(testData, 'name: wxxliams', { fuzzy: { tolerance: 0.5 } }))).toEqual([4])
+            expect(ids(Search.search(testData, 'name: wxxliams', { fuzzy: { tolerance: 0.5, maxDistance: 1 } }))).toEqual([])
+            expect(ids(Search.search(testData, 'name: wiliams', { fuzzy: { maxDistance: 0 } }))).toEqual([])
+        })
+
+        test('Min length', () => {
+            expect(ids(Search.search(testData, 'name: jhn', { fuzzy: { tolerance: 0.34 } }))).toEqual([1, 2, 3])
+            expect(ids(Search.search(testData, 'name: jhn', { fuzzy: { tolerance: 0.34, minLength: 4 } }))).toEqual([])
+            expect(ids(Search.search(testData, 'name: jhn', { fuzzy: { algorithm: 'subsequence', minLength: 4 } }))).toEqual([])
+        })
+
+        test('Numbers are not fuzzy matched, numeric strings are', () => {
+            expect(ids(Search.search(testData, 'age: 31', { fuzzy: true }))).toEqual([6])
+            expect(ids(Search.search(testData, 'age: 3o', { fuzzy: { tolerance: 0.5, minLength: 2 } }))).toEqual([])
+            expect(ids(Search.search(testData, 'zip: 10002', { fuzzy: true }))).toEqual([4])
+            expect(ids(Search.search(testData, 'zip: 10002', { fuzzy: { maxDistance: 0 } }))).toEqual([])
+        })
+
+        test('Keys are not fuzzy matched', () => {
+            expect(ids(Search.search(testData, 'nmae: john', { fuzzy: true }))).toEqual([])
+        })
+
+        test('Bare terms fuzzy match values', () => {
+            // "python" contains "thon", one edit away from "jhon"
+            expect(ids(Search.search(testData, 'jhon', { fuzzy: true }))).toEqual([1, 3, 4])
+            expect(ids(Search.search(testData, 'jhon', { fuzzy: true, allowKeyValueMatching: false }))).toEqual([])
+            expect(ids(Search.search(testData, '"jhon"', { fuzzy: true }))).toEqual([1, 3, 4])
+        })
+
+        test('Regex, range and "is" queries are not fuzzy', () => {
+            expect(ids(Search.search(testData, 'name*: jhon', { fuzzy: true }))).toEqual([])
+            expect(ids(Search.search(testData, 'age~: 26-27', { fuzzy: true }))).toEqual([])
+            expect(ids(Search.search(testData, 'active is ture', { fuzzy: true }))).toEqual([])
+            expect(ids(Search.search(testData, 'isTrial is nulll', { fuzzy: true }))).toEqual([])
+        })
+
+        test('Boolean operators and negation', () => {
+            expect(ids(Search.search(testData, 'not name: jhon', { fuzzy: true }))).toEqual([2, 4, 5, 6])
+            expect(ids(Search.search(testData, 'name: jhon and age: 30', { fuzzy: true }))).toEqual([1])
+            expect(ids(Search.search(testData, '(name: jhon or tags: desinger) and active is true', { fuzzy: true }))).toEqual([1, 2])
+        })
+
+        test('Child keys as values', () => {
+            expect(ids(Search.search(testData, 'contact: adress', { fuzzy: true, matchChildKeysAsValues: true }))).toEqual([4])
+        })
+
+        test('Excluded keys', () => {
+            expect(ids(Search.search(testData, 'jhon', { fuzzy: true, excludeKeys: ['name', 'email', 'tags'] }))).toEqual([])
+        })
+
+        test('Does not mutate the options', () => {
+            const options = { fuzzy: { sort: true } }
+            Search.search(testData, 'name: jhon', options)
+            expect(options).toEqual({ fuzzy: { sort: true } })
+        })
+
+        test('Constructor options', () => {
+            const engine = new Search({ fuzzy: { algorithm: 'levenshtein', tolerance: 0.5 } })
+            expect(ids(engine.search(testData, 'name: jhon'))).toEqual([1, 2, 3])
+        })
+
+        test('Results are not sorted by relevance when sort is disabled', () => {
+            expect(ids(Search.search(testData, 'name: jonson or name: doe', { fuzzy: true }))).toEqual([3, 2])
+            expect(ids(Search.search(testData, 'name: jonson or name: doe', { fuzzy: { sort: false } }))).toEqual([3, 2])
+        })
+
+        test('Sort by relevance', () => {
+            // Exact matches first, then fuzzy matches
+            expect(ids(Search.search(testData, 'name: jonson or name: doe', { fuzzy: { sort: true } }))).toEqual([2, 3])
+            expect(ids(Search.search(testData, 'name: jhon or name: doe', { fuzzy: { sort: true } }))).toEqual([2, 1, 3])
+
+            // More matched conditions rank higher, ties keep the original order
+            expect(ids(Search.search(testData, 'tags: developer or name: alice', { fuzzy: { sort: true } }))).toEqual([4, 1])
+
+            // Closer matches rank higher
+            const data = [
+                { id: 1, name: 'clr' },
+                { id: 2, name: 'color' },
+                { id: 3, name: 'colour' }
+            ]
+            expect(ids(Search.search(data, 'name: colour', { fuzzy: { sort: true, tolerance: 0.5 } }))).toEqual([3, 2, 1])
+            expect(ids(Search.search(data, 'name: colour', { fuzzy: { tolerance: 0.5 } }))).toEqual([1, 2, 3])
+        })
+
+        test('Sort by relevance with subsequence', () => {
+            const data = [
+                { id: 1, name: 'a-b-c' },
+                { id: 2, name: 'abc' },
+                { id: 3, name: 'ab-c' }
+            ]
+            expect(ids(Search.search(data, 'name: abc', { fuzzy: { algorithm: 'subsequence', sort: true } }))).toEqual([2, 3, 1])
+        })
+    })
 })

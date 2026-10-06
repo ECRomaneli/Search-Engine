@@ -21,6 +21,11 @@ const STRING = 'string'
 const NUMBER = 'number'
 const BIGINT = 'bigint'
 const OBJECT = 'object'
+const NO_MATCH = 0
+const FULL_MATCH = 1
+const DEFAULT_FUZZY_ALGORITHM: FuzzyAlgorithm = 'damerau'
+const DEFAULT_FUZZY_TOLERANCE = 0.25
+const DEFAULT_FUZZY_MIN_LENGTH = 3
 
 enum QueryType {
     PARTIAL = 1,
@@ -99,6 +104,63 @@ interface SearchOptions {
      * Default is unlimited levels.
      */
     maxLevels?: number
+    /** Enables typo-tolerant matching of string values. Use `true` for the defaults or an object to customize.
+     * Only plain value matches are affected. Keys, numbers, regex, range and "is" queries are always exact.
+     * 
+     * Default is false (disabled).
+     * @example
+     * { fuzzy: true } => "name: jhon" matches { name: 'John' }
+     */
+    fuzzy?: boolean | FuzzyOptions
+}
+
+/**
+ * - `damerau`: edit distance where insertions, deletions, substitutions and swapped adjacent characters count as 1 edit.
+ * - `levenshtein`: edit distance where insertions, deletions and substitutions count as 1 edit.
+ * - `subsequence`: the term characters must appear in order, gaps allowed (e.g. "jsmth" matches "John Smith").
+ */
+type FuzzyAlgorithm = 'damerau' | 'levenshtein' | 'subsequence'
+
+interface FuzzyOptions {
+    /** Algorithm used to compare the term with the values.
+     * 
+     * Default is 'damerau'.
+     */
+    algorithm?: FuzzyAlgorithm
+    /** Fraction (0 to 1) of the term length that can be edited. Ignored by `subsequence`.
+     * 
+     * Default is 0.25 (e.g. 1 edit for terms with 4 to 7 characters).
+     */
+    tolerance?: number
+    /** Maximum number of edits allowed regardless of the term length. Ignored by `subsequence`.
+     * 
+     * Default is unlimited.
+     */
+    maxDistance?: number
+    /** Terms shorter than this are matched exactly.
+     * 
+     * Default is 3.
+     */
+    minLength?: number
+    /** Whether to sort the results by relevance (closest matches first). Ties keep the original order.
+     * 
+     * Default is false.
+     */
+    sort?: boolean
+}
+
+interface ResolvedFuzzyOptions {
+    algorithm: FuzzyAlgorithm
+    tolerance: number
+    maxDistance: number
+    minLength: number
+    sort: boolean
+}
+
+interface EngineOptions extends Omit<SearchOptions, 'fuzzy'> {
+    fuzzy?: ResolvedFuzzyOptions
+    /** Score at which the traversal stops looking for better matches. */
+    stopScore: number
 }
 
 /**
@@ -138,13 +200,38 @@ class SearchEngine {
     static search<T extends Record<string, any>>(objList: T[], queryStr: string, options: SearchOptions = {}): T[] {
         if (!objList) { return [] }
         if (!queryStr || queryStr.trim() === EMPTY_STR) { return objList.slice() }
-        options.allowNumericString === void 0 && (options.allowNumericString = true)
-        options.allowKeyValueMatching === void 0 && (options.allowKeyValueMatching = true)
-        return [...evaluateGroup(new Set(objList), extractConditionsFromQuery(queryStr.toLowerCase()), options)]
+        const engineOptions = resolveOptions(options)
+        const group = extractConditionsFromQuery(queryStr.toLowerCase())
+        const results = [...evaluateGroup(new Set(objList), group, engineOptions)]
+        return engineOptions.fuzzy && engineOptions.fuzzy.sort ? sortByRelevance(results, group, engineOptions) : results
     }
 }
 
-function evaluateGroup<T>(objList: Set<T>, group: GroupQuery, options: SearchOptions): Set<T> {
+function resolveOptions(options: SearchOptions): EngineOptions {
+    return {
+        excludeKeys: options.excludeKeys,
+        allowNumericString: options.allowNumericString === void 0 ? true : options.allowNumericString,
+        allowKeyValueMatching: options.allowKeyValueMatching === void 0 ? true : options.allowKeyValueMatching,
+        matchChildKeysAsValues: options.matchChildKeysAsValues,
+        maxLevels: options.maxLevels,
+        fuzzy: resolveFuzzyOptions(options.fuzzy),
+        stopScore: Number.MIN_VALUE
+    }
+}
+
+function resolveFuzzyOptions(fuzzy?: boolean | FuzzyOptions): ResolvedFuzzyOptions | undefined {
+    if (!fuzzy) { return void 0 }
+    const opts: FuzzyOptions = fuzzy === true ? {} : fuzzy
+    return {
+        algorithm: opts.algorithm === 'levenshtein' || opts.algorithm === 'subsequence' ? opts.algorithm : DEFAULT_FUZZY_ALGORITHM,
+        tolerance: opts.tolerance === void 0 ? DEFAULT_FUZZY_TOLERANCE : Math.min(Math.max(opts.tolerance, 0), 1),
+        maxDistance: opts.maxDistance === void 0 ? Infinity : Math.max(Math.floor(opts.maxDistance), 0),
+        minLength: opts.minLength === void 0 ? DEFAULT_FUZZY_MIN_LENGTH : opts.minLength,
+        sort: !!opts.sort
+    }
+}
+
+function evaluateGroup<T>(objList: Set<T>, group: GroupQuery, options: EngineOptions): Set<T> {
     if (group.conditions.length === 0) { return group.negated ? new Set() : objList }
     
     let currentResults = evaluateCondition(objList, group.conditions[0], options)
@@ -169,24 +256,49 @@ function evaluateGroup<T>(objList: Set<T>, group: GroupQuery, options: SearchOpt
     return negatedResult
 }
 
-function evaluateCondition<T>(objList: Set<T>, condition: Query | GroupQuery, options: SearchOptions): Set<T> {
+function evaluateCondition<T>(objList: Set<T>, condition: Query | GroupQuery, options: EngineOptions): Set<T> {
     if ('conditions' in condition) { return evaluateGroup(objList, condition, options) }
     
     const resultSet = new Set<T>()
     for (const obj of objList) {
-        if (condition.negated !== findQuery(obj, condition, EMPTY_STR, options, 1)) {
+        if (condition.negated !== (findQuery(obj, condition, EMPTY_STR, options, 1) > NO_MATCH)) {
             resultSet.add(obj)
         }
     }
     return resultSet
 }
 
-function findQuery(obj: any, query: Query, nestedKeys: string, options: SearchOptions, level: number, keyFound?: boolean): boolean {
-    if (obj === null || obj === void 0 || typeof obj !== OBJECT) { return false }
+function sortByRelevance<T>(results: T[], group: GroupQuery, options: EngineOptions): T[] {
+    const scoreOptions: EngineOptions = Object.assign({}, options, { stopScore: FULL_MATCH })
+    return results
+        .map(item => ({ item, score: scoreGroup(item, group, false, scoreOptions) }))
+        .sort((a, b) => b.score - a.score)
+        .map(entry => entry.item)
+}
+
+/** Sums the best score of every condition that is not negated (considering the negation of the parent groups). */
+function scoreGroup(obj: any, group: GroupQuery, negated: boolean, options: EngineOptions): number {
+    negated = negated !== !!group.negated
+    let score = NO_MATCH
+    for (const condition of group.conditions) {
+        if ('conditions' in condition) {
+            score += scoreGroup(obj, condition, negated, options)
+        } else if (negated === !!condition.negated) {
+            score += findQuery(obj, condition, EMPTY_STR, options, 1)
+        }
+    }
+    return score
+}
+
+/** Returns the best score found, stopping as soon as it reaches `options.stopScore`. */
+function findQuery(obj: any, query: Query, nestedKeys: string, options: EngineOptions, level: number, keyFound?: boolean): number {
+    if (obj === null || obj === void 0 || typeof obj !== OBJECT) { return NO_MATCH }
     const keys = Object.keys(obj)
 
     obj.length !== void 0 && keys.push('length')
 
+    let best = NO_MATCH
+    let score: number
     nestedKeys += KEY_SEPARATOR
     for (const key of keys) {
         const newNestedKeys = nestedKeys + key.toLowerCase()
@@ -195,19 +307,19 @@ function findQuery(obj: any, query: Query, nestedKeys: string, options: SearchOp
 
         if (keyFound === void 0) {
             if (newNestedKeys.indexOf(query.key) === UNKNOWN) {
-                if (findQuery(obj[key], query, newNestedKeys, options, level + 1)) { return true }
-                if (options.allowKeyValueMatching && query.value === void 0 && match(query.key, obj[key], query.type, options)) { return true }
+                if ((score = findQuery(obj[key], query, newNestedKeys, options, level + 1)) > best && (best = score) >= options.stopScore) { return best }
+                if (options.allowKeyValueMatching && query.value === void 0 &&
+                    (score = match(query.key, obj[key], query.type, options)) > best && (best = score) >= options.stopScore) { return best }
                 continue
             }
 
-            if (query.value === void 0) { return true }
+            if (query.value === void 0) { return FULL_MATCH }
         }
 
-        if (match(query.value, obj[key], query.type, options) || findQuery(obj[key], query, newNestedKeys, options, level + 1, true)) {
-            return true
-        }
+        if ((score = match(query.value, obj[key], query.type, options)) > best && (best = score) >= options.stopScore) { return best }
+        if ((score = findQuery(obj[key], query, newNestedKeys, options, level + 1, true)) > best && (best = score) >= options.stopScore) { return best }
     }
-    return false
+    return best
 }
 
 function extractConditionsFromQuery(query: string, regex = new RegExp(TOKENIZER), group = new GroupQuery()): GroupQuery {
@@ -288,51 +400,127 @@ function getQuery(negated: boolean, type?: string, key?: string, value?: string)
     return query
 }
 
-function match(expectedValue: any, value: any, type: QueryType, options: SearchOptions): boolean {   
+function match(expectedValue: any, value: any, type: QueryType, options: EngineOptions): number {   
     const typeOf = value === null || value === void 0 ? STRING : typeof value
 
     if (typeOf === OBJECT) {
         if (Array.isArray(value)) {
-            if (type === QueryType.IS && expectedValue === 'empty' && value.length === 0) { return true }
-            return false
+            if (type === QueryType.IS && expectedValue === 'empty' && value.length === 0) { return FULL_MATCH }
+            return NO_MATCH
         }
 
+        let best = NO_MATCH
         if (options.matchChildKeysAsValues) {
             for (const v of Object.keys(value)) {
-                if (match(expectedValue, v, type, options)) { return true }
+                const score = match(expectedValue, v, type, options)
+                if (score > best && (best = score) >= options.stopScore) { return best }
             }
         }
-        return false
+        return best
     }
 
     if (type === QueryType.RANGE) {
-        if (typeOf !== NUMBER && typeOf !== BIGINT && !(options.allowNumericString && typeOf === STRING && !isNaN(value = +value))) { return false }
-        return matchRange(expectedValue as Range, value)
+        if (typeOf !== NUMBER && typeOf !== BIGINT && !(options.allowNumericString && typeOf === STRING && !isNaN(value = +value))) { return NO_MATCH }
+        return matchRange(expectedValue as Range, value) ? FULL_MATCH : NO_MATCH
     }
     
-    if (type === QueryType.REGEX) { return (expectedValue as RegExp).test(value) }
+    if (type === QueryType.REGEX) { return (expectedValue as RegExp).test(value) ? FULL_MATCH : NO_MATCH }
 
     if (type === QueryType.IS) {
         switch (expectedValue) {
-            case 'true': return value === true
-            case 'false': return value === false
+            case 'true': return value === true ? FULL_MATCH : NO_MATCH
+            case 'false': return value === false ? FULL_MATCH : NO_MATCH
             case 'undef':
-            case 'undefined': return value === void 0
-            case 'null': return value === null
-            case 'blank': return value === EMPTY_STR
-            default: return false
+            case 'undefined': return value === void 0 ? FULL_MATCH : NO_MATCH
+            case 'null': return value === null ? FULL_MATCH : NO_MATCH
+            case 'blank': return value === EMPTY_STR ? FULL_MATCH : NO_MATCH
+            default: return NO_MATCH
         }
     }
 
     if (typeOf === STRING) {
-        return `${value}`.toLowerCase().indexOf(expectedValue) !== UNKNOWN
+        const str = `${value}`.toLowerCase()
+        if (str.indexOf(expectedValue) !== UNKNOWN) { return FULL_MATCH }
+        return options.fuzzy && value !== null && value !== void 0 ? fuzzyMatch(expectedValue, str, options.fuzzy) : NO_MATCH
     }
 
     if (typeOf === NUMBER || typeOf === BIGINT) {
-        return `${value}`.indexOf(expectedValue) !== UNKNOWN
+        return `${value}`.indexOf(expectedValue) !== UNKNOWN ? FULL_MATCH : NO_MATCH
     }
 
-    return false
+    return NO_MATCH
+}
+
+/** Returns a score between 0 (no match) and 1 (exact match) for the term inside the text. */
+function fuzzyMatch(term: string, text: string, fuzzy: ResolvedFuzzyOptions): number {
+    if (term.length < fuzzy.minLength) { return NO_MATCH }
+
+    if (fuzzy.algorithm === 'subsequence') { return subsequenceScore(term, text) }
+
+    const maxDistance = Math.min(fuzzy.maxDistance, Math.floor(term.length * fuzzy.tolerance))
+    if (maxDistance === 0) { return NO_MATCH }
+
+    const distance = substringEditDistance(term, text, maxDistance, fuzzy.algorithm === 'damerau')
+    return distance > maxDistance ? NO_MATCH : FULL_MATCH - distance / (term.length + 1)
+}
+
+/**
+ * Smallest edit distance between the term and any substring of the text (Sellers' algorithm).
+ * Returns any value greater than `maxDistance` when no substring is within the limit.
+ * When `transpositions` is true, swapping two adjacent characters counts as a single edit (optimal string alignment).
+ */
+function substringEditDistance(term: string, text: string, maxDistance: number, transpositions: boolean): number {
+    const m = term.length
+    if (text.length < m - maxDistance) { return maxDistance + 1 }
+
+    let prev2 = new Array<number>(m + 1)
+    let prev = new Array<number>(m + 1)
+    let curr = new Array<number>(m + 1)
+    for (let i = 0; i <= m; i++) { prev[i] = i }
+
+    let best = prev[m]
+    for (let j = 1; j <= text.length; j++) {
+        const textChar = text.charCodeAt(j - 1)
+        curr[0] = 0
+        for (let i = 1; i <= m; i++) {
+            const termChar = term.charCodeAt(i - 1)
+            let cost = prev[i - 1] + (termChar === textChar ? 0 : 1)
+            if (prev[i] + 1 < cost) { cost = prev[i] + 1 }
+            if (curr[i - 1] + 1 < cost) { cost = curr[i - 1] + 1 }
+            if (transpositions && i > 1 && j > 1 && termChar === text.charCodeAt(j - 2) && term.charCodeAt(i - 2) === textChar && prev2[i - 2] + 1 < cost) {
+                cost = prev2[i - 2] + 1
+            }
+            curr[i] = cost
+        }
+        if (curr[m] < best && (best = curr[m]) === 0) { return 0 }
+
+        const recycled = prev2
+        prev2 = prev
+        prev = curr
+        curr = recycled
+    }
+    return best
+}
+
+/** Scores the tightest window of the text containing all term characters in order (1 when contiguous). */
+function subsequenceScore(term: string, text: string): number {
+    const m = term.length
+    let best = NO_MATCH
+    let start = text.indexOf(term[0])
+    while (start !== UNKNOWN && text.length - start >= m) {
+        let end = start
+        for (let i = 1; i < m && end !== UNKNOWN; i++) { end = text.indexOf(term[i], end + 1) }
+        if (end === UNKNOWN) { break }
+
+        // Walk backwards from the end to find the tightest start for this end
+        let tightStart = end
+        for (let i = m - 2; i >= 0; i--) { tightStart = text.lastIndexOf(term[i], tightStart - 1) }
+
+        const score = m / (end - tightStart + 1)
+        if (score > best && (best = score) === FULL_MATCH) { break }
+        start = text.indexOf(term[0], tightStart + 1)
+    }
+    return best
 }
 
 function matchRange(expectedRange: Range, numValue: number): boolean {

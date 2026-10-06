@@ -253,17 +253,27 @@ function runSearchBenchmark() {
         "(tag1 and red) or (price~:500-1000)",
         "not details.color:green",
         "description:\"searchable content\"",
-        "tags*:.tag+ and details.weight~:0-5",
-        '(details.color*:^g or description:\"searchable content\" and not price~:0-100) or ("red" and not (age:45 or tags:golang)) or (tag2 and not (name:item))'
+        'tags*:.tag+ and details.weight~:0-5',
+        '(details.color*:^g or description:\"searchable content\" and not price~:0-100) or ("red" and not (age:45 or tags:golang)) or (tag2 and not (name:item))',
+        "description:serchable",
+        "details.color:yelow or name:prodcut"
     ]
 
     const SearchEngine = require('../dist/npm/index.js')
     const instance = new SearchEngine({ includeValuesInKeySearch: false, allowNumericString: false })
+    const fuzzyDamerau = new SearchEngine({ fuzzy: { algorithm: 'damerau' } })
+    const fuzzyLevenshtein = new SearchEngine({ fuzzy: { algorithm: 'levenshtein' } })
+    const fuzzySubsequence = new SearchEngine({ fuzzy: { algorithm: 'subsequence' } })
+    const fuzzySorted = new SearchEngine({ fuzzy: { sort: true } })
     
     // Implementations to benchmark
     const implementations = {
         "Static": (...args) => SearchEngine.search(...args),
-        "Constructor": (...args) => instance.search(...args)
+        "Constructor": (...args) => instance.search(...args),
+        "Fuzzy Damerau": (...args) => fuzzyDamerau.search(...args),
+        "Fuzzy Levenshtein": (...args) => fuzzyLevenshtein.search(...args),
+        "Fuzzy Subsequence": (...args) => fuzzySubsequence.search(...args),
+        "Fuzzy Sorted": (...args) => fuzzySorted.search(...args)
         
         // Add alternative implementations to compare:
         // "Alternative": alternativeSearch,
